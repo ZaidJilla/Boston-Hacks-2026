@@ -5,6 +5,7 @@ import { Agent } from "@mastra/core/agent";
 import { createTool } from "@mastra/core/tools";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { z } from "zod";
+import { GEMINI_MODEL } from "./config";
 import { getRestaurant, getStation, restaurants } from "./data";
 import { getArrivals } from "./mbta";
 import { getTransitRoute } from "./routes";
@@ -24,7 +25,7 @@ export interface ChatTurn {
 
 // ---- Tools (each one is a typed function the model can call) ----
 
-const searchRestaurantsTool = createTool({
+export const searchRestaurantsTool = createTool({
   id: "searchRestaurants",
   description:
     "Find restaurants. Filter by craving, max price tier (1=$, 2=$$, 3=$$$), the T line at the nearest stop, and independent-only. Returns ids, names, price, and nearest stop.",
@@ -67,11 +68,6 @@ const getRouteTool = createTool({
   },
 });
 
-const replySchema = z.object({
-  message: z.string().describe("One or two plain sentences, sentence case, no emoji."),
-  pickIds: z.array(z.string()).max(3).describe("Restaurant ids from the tools, best first."),
-});
-
 let agent: Agent | null = null;
 function getAgent(apiKey: string): Agent {
   return (agent ??= new Agent({
@@ -83,9 +79,10 @@ function getAgent(apiKey: string): Agent {
       "Always call searchRestaurants. Only recommend restaurants it returned, never invent one.",
       "Use getRoute or getArrivals when the student asks how long it takes or when the next train is.",
       "Prefer independent places when it is a tie. Budget words like cheap or broke mean maxPrice 1.",
-      "Reply in one or two short sentences and return up to 3 restaurant ids.",
+      "The app shows restaurant cards itself, so reply in one or two short plain sentences and do not list details.",
+      "No emoji. If nothing matches, say so and suggest a looser craving or budget.",
     ].join("\n"),
-    model: createGoogleGenerativeAI({ apiKey })("gemini-2.0-flash"),
+    model: createGoogleGenerativeAI({ apiKey })(GEMINI_MODEL),
     tools: { searchRestaurants: searchRestaurantsTool, getArrivals: getArrivalsTool, getRoute: getRouteTool },
   }));
 }
@@ -112,15 +109,28 @@ export async function askConcierge(prompt: string, history: ChatTurn[] = []): Pr
         ? { role: "user" as const, content: t.content }
         : { role: "assistant" as const, content: t.content },
     );
-    const out = await getAgent(key).generate(messages, {
-      maxSteps: 6,
-      structuredOutput: { schema: replySchema },
-    });
-    const obj = out.object as z.infer<typeof replySchema> | undefined;
-    if (!obj) return fallback(prompt);
+    // Cap the wait so a slow or overloaded model falls back instead of hanging the chat.
+    const out = await Promise.race([
+      getAgent(key).generate(messages, { maxSteps: 4 }),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timed out after 15 s")), 15_000)),
+    ]);
+    const text = out.text?.trim();
+    if (!text) {
+      console.error("[concierge] Gemini returned no text (rate limit or error?), using fallback");
+      return fallback(prompt);
+    }
+
+    // Picks are whatever the last searchRestaurants call returned, so the model can't invent a place.
     const known = new Map(restaurants.map((r) => [r.id, r]));
-    const picks = obj.pickIds.map((id) => known.get(id)).filter((r): r is Restaurant => Boolean(r));
-    return { message: obj.message, picks, source: "gemini" };
+    let ids: string[] = [];
+    for (const step of out.steps ?? []) {
+      for (const tr of step.toolResults ?? []) {
+        const p = (tr as { payload?: { toolName?: string; result?: unknown } }).payload;
+        if (p?.toolName === "searchRestaurants" && Array.isArray(p.result)) ids = p.result.map((r: { id: string }) => r.id);
+      }
+    }
+    const picks = ids.map((id) => known.get(id)).filter((r): r is Restaurant => Boolean(r)).slice(0, 3);
+    return { message: text, picks, source: "gemini" };
   } catch (err) {
     console.error("[concierge] Gemini/Mastra call failed, using fallback:", err instanceof Error ? err.message : err);
     return fallback(prompt);

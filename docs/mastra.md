@@ -11,17 +11,17 @@ The main filters in this app are craving, budget, and location. The map has them
 ## Design
 
 ```
-student message ──► Mastra Agent (Gemini 2.0 Flash)
+student message ──► Mastra Agent (Gemini 3.5 Flash Lite)
                         │  calls tools as needed
                         ├─ searchRestaurants({ craving, maxPrice, line, independentOnly })
                         ├─ getRoute({ restaurantId })        → Google Routes, or our station-data estimate
                         └─ getArrivals({ restaurantId })     → MBTA V3 live predictions
                         │
                         ▼
-              structured output { message, pickIds[] }
+              short text reply + the last searchRestaurants result
                         │
                         ▼
-   server maps pickIds to real restaurants ──► cards with live arrival chips
+   server turns that result into real restaurants ──► cards with live arrival chips
 ```
 
 ### Tools
@@ -36,8 +36,8 @@ All three are Mastra `createTool` definitions with `zod` input schemas, defined 
 
 ### Guardrails
 
-- **No invented restaurants.** The agent returns restaurant ids, not names. The server looks each id up in our data and drops any it doesn't know, so the model can't recommend a place that doesn't exist.
-- **Structured output.** The reply is validated against a `zod` schema (`message` plus up to 3 `pickIds`).
+- **No invented restaurants.** The cards come from what the `searchRestaurants` tool returned, looked up again in our data, never from the model's text. The model chooses the filters and writes one or two sentences, so it can't recommend a place that doesn't exist.
+- **Two model calls per question.** One to pick the tool and filters, one for the reply. This matters on Gemini's free tier (15 requests per minute).
 - **Never breaks the demo.** With no `GEMINI_API_KEY`, or if the model call fails, a keyword parser (`parseQuery` in `src/lib/search.ts`) answers from the same filter function. The response includes `source: "gemini" | "fallback"` so we can tell which ran.
 - **Server only.** The key never reaches the browser.
 
