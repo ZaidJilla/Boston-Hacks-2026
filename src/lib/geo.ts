@@ -203,3 +203,12 @@ export function activeFilterCount(f: RestaurantFilters): number {
     (f.hideChains ? 1 : 0)
   );
 }
+
+// Used by /api/checkin (from the team skeleton). Keep these signatures stable.
+export function distanceMeters(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  return distanceM({ lat: aLat, lng: aLng }, { lat: bLat, lng: bLng });
+}
+
+export function distanceKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  return distanceMeters(aLat, aLng, bLat, bLng) / 1000;
+}

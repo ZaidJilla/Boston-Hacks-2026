@@ -1,6 +1,8 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+@import "leaflet/dist/leaflet.css";
 
 html, body { height: 100%; }
-body { background: #f8fafc; color: #0f172a; -webkit-tap-highlight-color: transparent; }
+body { background: #F6F4EF; color: #14181C; }
+:focus-visible { outline: 3px solid #003DA5; outline-offset: 2px; }

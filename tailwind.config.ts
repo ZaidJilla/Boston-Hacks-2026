@@ -5,12 +5,17 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        tred: "#DA291C",
-        torange: "#ED8B00",
-        tblue: "#003DA5",
-        tgreen: "#00843D",
-        tsilver: "#7C878E",
-        tmattapan: "#DA291C",
+        // T line colors are the palette anchors. Use for lines, quests, progress.
+        line: {
+          red: "#DA291C",
+          orange: "#ED8B00",
+          green: "#00843D",
+          blue: "#003DA5",
+          silver: "#7C878E",
+        },
+        fog: "#C9CED3",
+        ink: "#14181C",
+        paper: "#F6F4EF",
       },
     },
   },
