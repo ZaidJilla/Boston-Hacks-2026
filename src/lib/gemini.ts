@@ -1,11 +1,9 @@
 // Server only. Receipt verification with Gemini vision. Never throws.
 import { GoogleGenAI, Type } from "@google/genai";
-import { DEMO_MODE } from "./config";
+import { DEMO_MODE, GEMINI_MODEL } from "./config";
 import { demoVerdict } from "./demo";
 import { RECEIPT_GRACE_HOURS } from "./scoring";
 import type { ReceiptVerdict } from "./types";
-
-const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 const TIMEOUT_MS = 15_000;
 /** ~4 MB image. The client should downscale to ~1600 px JPEG before upload. */
 export const MAX_RECEIPT_BASE64_CHARS = 5_500_000;
@@ -124,6 +122,20 @@ function wordMatches(x: string, w: string): boolean {
   return i === short.length && short.length >= long.length / 2;
 }
 
+// Gemini returns 503 "high demand" / 429 / 500 under load. These usually clear in a second.
+const TRANSIENT = new Set([429, 500, 503]);
+async function withRetry<T>(call: () => Promise<T>, attempts = 3): Promise<T> {
+  for (let i = 1; ; i++) {
+    try {
+      return await call();
+    } catch (err) {
+      const status = (err as { status?: number }).status;
+      if (i >= attempts || !status || !TRANSIENT.has(status)) throw err;
+      await new Promise((r) => setTimeout(r, 400 * i));
+    }
+  }
+}
+
 export async function verifyReceipt(
   imageBase64: string | undefined,
   restaurantName: string,
@@ -139,21 +151,24 @@ export async function verifyReceipt(
   try {
     const ai = new GoogleGenAI({ apiKey: key, httpOptions: { timeout: TIMEOUT_MS } });
     const today = todayInBoston();
-    const res = await ai.models.generateContent({
-      model: MODEL,
+    const res = await withRetry(() => ai.models.generateContent({
+      model: GEMINI_MODEL,
       contents: [
         { inlineData: image },
         {
+          // The expected restaurant is deliberately NOT in the prompt: told what to look for, the
+          // model "reads" it off blurry photos. It transcribes; our code compares.
           text:
-            `You verify restaurant receipts for a game. Today is ${today} in Boston.\n` +
-            `Expected restaurant: "${restaurantName}".\n` +
-            `Read the photo. Report whether it is a real printed or digital receipt, the merchant ` +
-            `name exactly as printed, and the transaction date as YYYY-MM-DD ("" if not visible). ` +
-            `Do not guess unreadable fields.`,
+            `Transcribe this photo for a receipt checker. Today is ${today} in Boston.\n` +
+            `- isReceipt: is it a printed or digital purchase receipt?\n` +
+            `- legible: can you clearly read the merchant name AND the date? false if blurry, cut off or too dark.\n` +
+            `- merchantName: the business name exactly as printed, "" if not clearly readable.\n` +
+            `- receiptDate: the transaction date as YYYY-MM-DD, "" if not clearly readable.\n` +
+            `Never guess or infer text you cannot actually read.`,
         },
       ],
       config: { responseMimeType: "application/json", responseSchema: RECEIPT_SCHEMA, temperature: 0 },
-    });
+    }));
 
     const r = JSON.parse(res.text ?? "{}") as Partial<GeminiReceipt>;
     // Our rules, not Gemini's opinion:
