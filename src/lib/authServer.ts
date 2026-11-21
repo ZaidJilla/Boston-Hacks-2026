@@ -42,7 +42,8 @@ export type AuthResult = { ok: true; user: StoreUser } | { ok: false; status: 40
  * 2. A token that was sent but fails verification (e.g. expired) is rejected, never quietly
  *    downgraded to the demo player (that would credit a real user's meal to Demo Student).
  *    Exception: if the server has no Firebase Admin keys it can't verify anything, so tokens are ignored.
- * 3. No token: the demo player in demo mode (optionally with body hints), otherwise 401.
+ * 3. No token: the demo player in demo mode, otherwise 401. `demoHint` is for READ-ONLY routes
+ *    (e.g. viewing another profile in demo mode). Never pass it from a route that writes.
  */
 export async function userFromRequest(req: Request, demoHint: Partial<StoreUser> = {}): Promise<AuthResult> {
   const header = req.headers.get("authorization") ?? "";

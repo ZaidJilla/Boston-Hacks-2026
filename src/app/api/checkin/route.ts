@@ -14,7 +14,8 @@ import type { CheckinRequest, CheckinResult } from "@/lib/types";
 
 export const runtime = "nodejs"; // pg + firebase-admin need Node, not Edge
 
-type Body = CheckinRequest & { uid?: string; displayName?: string; college?: string };
+// Any uid/displayName/college in the body is ignored: identity comes only from the token.
+type Body = CheckinRequest;
 
 const fail = (error: string, status = 400) =>
   NextResponse.json(
@@ -29,9 +30,11 @@ export async function POST(req: Request) {
   } catch {
     return fail("Invalid request");
   }
+  if (!body || typeof body !== "object" || Array.isArray(body)) return fail("Invalid request");
 
-  // 1. Who
-  const auth = await userFromRequest(req, { uid: body.uid, displayName: body.displayName, college: body.college });
+  // 1. Who. No body hints: without a token (demo mode only) this is always the demo player,
+  // so nobody can write to, rename, or add points to another player's account.
+  const auth = await userFromRequest(req);
   if (!auth.ok) return fail(auth.error, auth.status);
   const user = auth.user;
 
