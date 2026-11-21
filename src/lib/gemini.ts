@@ -1,6 +1,6 @@
 // Server only. Never throws: falls back to the demo verdict.
 import { GoogleGenAI } from "@google/genai";
-import { DEMO_MODE } from "./config";
+import { DEMO_MODE, GEMINI_MODEL } from "./config";
 import { demoVerdict } from "./demo";
 import type { ReceiptVerdict } from "./types";
 
@@ -15,7 +15,7 @@ export async function verifyReceipt(
     const ai = new GoogleGenAI({ apiKey: key });
     const today = new Date().toISOString().slice(0, 10);
     const res = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: GEMINI_MODEL,
       contents: [
         { inlineData: { mimeType: "image/jpeg", data: imageBase64 } },
         {

@@ -41,7 +41,7 @@ Judging criteria: impact, user fit, technical implementation, design, presentati
 - **Solana devnet** via `@solana/web3.js` and `@solana/spl-token` (server-side only). Badges are 0-decimal, supply-1 SPL mints; check-ins use the Memo program. Ask before adding Metaplex.
 - MBTA GTFS static (`https://cdn.mbta.com/MBTA_GTFS.zip`) parsed at build time by scripts
 - MBTA V3 API (`https://api-v3.mbta.com`) for live predictions
-- Google Routes API (`computeRoutes`, travelMode `TRANSIT`) for directions. Optional; canned fallback if no key.
+- **Trip planner:** our own, in `src/lib/planner.ts`. Dijkstra over `data/graph.json` (built from MBTA GTFS by `scripts/graph.ts`: subway, light rail, bus, Silver Line), with live waits from MBTA predictions and live alerts. Free, no billing. Google Routes API is an optional fallback only.
 - Deploy: Docker on a Vultr Cloud Compute instance (port 8080)
 
 Don't add dependencies beyond these without asking.
@@ -124,6 +124,7 @@ The app should feel like Boston, not a generic SaaS dashboard.
 ```
 npm run dev              Start local dev server
 npm run data:all         Run hoods, gtfs, food in order
+npm run data:graph       Build the trip planner graph from MBTA GTFS (data/graph.json)
 npm run data:hoods       Prepare neighborhood GeoJSON
 npm run data:gtfs        Parse MBTA GTFS into stations, lines, travel times
 npm run data:food        Pull restaurants from OpenStreetMap and tag them

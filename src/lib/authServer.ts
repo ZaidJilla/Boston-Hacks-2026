@@ -3,7 +3,7 @@
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 
-export async function verifyIdToken(token: string | null): Promise<{ uid: string; email: string } | null> {
+export async function verifyIdToken(token: string | null): Promise<{ uid: string; email: string; name: string } | null> {
   const { FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY } = process.env;
   if (!token || !FIREBASE_PROJECT_ID || !FIREBASE_CLIENT_EMAIL || !FIREBASE_PRIVATE_KEY) return null;
   try {
@@ -17,7 +17,7 @@ export async function verifyIdToken(token: string | null): Promise<{ uid: string
         }),
       });
     const decoded = await getAuth(app).verifyIdToken(token);
-    return { uid: decoded.uid, email: decoded.email ?? "" };
+    return { uid: decoded.uid, email: decoded.email ?? "", name: decoded.name ?? "" };
   } catch {
     return null;
   }
