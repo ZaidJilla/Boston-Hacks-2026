@@ -1,24 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { cravingById, lineById, type Restaurant } from "@/lib/geo";
+import { cravingById, LINE_ORDER, LINE_SHORT, lineColor, type LineId, type Restaurant } from "@/lib/geo";
 
-export function LineDots({ lineIds }: { lineIds: string[] }) {
-  // collapse Green B/C/D/E into one dot
-  const seen = new Set<string>();
-  const dots = lineIds
-    .map((id) => lineById.get(id))
-    .filter((l): l is NonNullable<typeof l> => !!l && !seen.has(l.group) && !!seen.add(l.group));
+/** Small round T-line badges, e.g. [G][O]. */
+export function LineDots({ lines }: { lines: LineId[] }) {
   return (
     <span className="inline-flex gap-0.5">
-      {dots.map((l) => (
+      {LINE_ORDER.filter((l) => lines.includes(l)).map((l) => (
         <span
-          key={l.group}
-          title={l.name}
-          className="inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold leading-none"
-          style={{ background: l.color, color: l.textColor }}
+          key={l}
+          title={`${l[0].toUpperCase()}${l.slice(1)} Line`}
+          className="inline-flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-bold leading-none text-white"
+          style={{ background: lineColor(l) }}
         >
-          {l.group === "silver" ? "SL" : l.group[0].toUpperCase()}
+          {LINE_SHORT[l]}
         </span>
       ))}
     </span>
@@ -34,38 +30,39 @@ export default function RestaurantCard({
   unlocked: boolean;
   onClose: () => void;
 }) {
-  const c = cravingById.get(r.craving);
+  const emoji = cravingById.get(r.craving)?.emoji;
   const st = r.nearestStation;
   return (
-    <div className="fixed inset-x-3 bottom-[104px] z-[1001] mx-auto max-w-md">
-      <div className="relative rounded-2xl bg-white p-4 shadow-xl ring-1 ring-slate-200">
+    <div className="fixed inset-x-3 bottom-[164px] z-[1001] mx-auto max-w-md">
+      <div className="relative rounded-2xl bg-white p-4 shadow-xl ring-1 ring-black/10">
         <button
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full text-slate-400 active:bg-slate-100"
+          className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full text-ink/50 active:bg-black/5"
         >
           ✕
         </button>
-        <Link href={`/restaurant/${r.id}`} className="block pr-8">
-          <p className="text-xs font-medium text-slate-500">
-            {unlocked ? "✓" : "🌫️"} {r.neighborhoodName}
-            {r.isChain && <span className="ml-1.5 rounded bg-slate-100 px-1.5 py-0.5 text-[10px]">chain</span>}
-          </p>
-          <h2 className="mt-0.5 text-lg font-bold leading-tight text-slate-900">{r.name}</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            {c?.emoji} {c?.label} · <span className="font-semibold text-slate-800">{r.priceLabel}</span>
-            {r.priceEstimated && <span className="text-slate-400"> est.</span>}
-          </p>
-          <p className="mt-2 flex items-center gap-1.5 text-sm text-slate-600">
-            <LineDots lineIds={st.lines} />
-            <span>
-              {st.name} · {st.walkMin} min walk
-            </span>
-          </p>
-          <span className="mt-3 flex min-h-[44px] items-center justify-center rounded-xl bg-slate-900 text-sm font-semibold text-white">
-            View spot →
+        <p className="pr-10 text-xs font-medium text-ink/60">
+          {r.neighborhoodName} · {unlocked ? "unlocked" : "foggy"}
+          {r.isChain && <span className="ml-1.5 rounded bg-black/5 px-1.5 py-0.5 text-[10px]">Chain</span>}
+        </p>
+        <h2 className="mt-0.5 pr-10 text-lg font-bold leading-tight text-ink">{r.name}</h2>
+        <p className="mt-1 text-sm text-ink/70">
+          {emoji} {r.categoryLabel} · <span className="font-semibold text-ink">{r.priceLabel}</span>
+          {r.priceEstimated && <span className="text-ink/40"> est.</span>}
+        </p>
+        <p className="mt-2 flex items-center gap-1.5 text-sm text-ink/70">
+          <LineDots lines={st.lines} />
+          <span>
+            {st.name} · {st.walkMin} min walk
           </span>
+        </p>
+        <Link
+          href={`/restaurant/${r.id}`}
+          className="mt-3 flex min-h-[44px] items-center justify-center rounded-xl bg-ink text-sm font-semibold text-white"
+        >
+          View spot
         </Link>
       </div>
     </div>

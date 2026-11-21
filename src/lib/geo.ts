@@ -1,72 +1,82 @@
 /**
- * Shared geo types + helpers over the generated data in /data.
- * Safe to import from server or client code.
+ * Geo helpers + richer views of the generated data in /data. Server or client safe.
+ *
+ * The base shapes come from the shared contract in ./types.ts. The types here only *extend*
+ * them with the extra fields the data scripts write, so anything typed against types.ts still works.
  */
 import type { Feature, FeatureCollection, MultiPolygon, Polygon } from "geojson";
+import type {
+  Craving,
+  Line as LineBase,
+  LineId,
+  PriceTier,
+  Restaurant as RestaurantBase,
+  Station as StationBase,
+} from "./types";
+import { LINE_COLORS } from "./config";
+import { UNLOCK_THRESHOLD } from "./scoring";
 import neighborhoodsJson from "../../data/neighborhoods.json";
 import stationsJson from "../../data/stations.json";
 import linesJson from "../../data/lines.json";
 import restaurantsJson from "../../data/restaurants.json";
 import cravingsJson from "../../data/cravings.json";
 
-export type PriceTier = 1 | 2 | 3;
+export { UNLOCK_THRESHOLD };
+export type { Craving, LineId, PriceTier };
 
 export interface NeighborhoodProps {
   id: string;
   name: string;
-  color: string;
   /** [lat, lng] point guaranteed to be inside the polygon */
   center: [number, number];
   sqmiles: number | null;
 }
-export type Neighborhood = Feature<Polygon | MultiPolygon, NeighborhoodProps>;
+export type NeighborhoodFeature = Feature<Polygon | MultiPolygon, NeighborhoodProps>;
 
-export interface Station {
-  id: string;
-  name: string;
-  lat: number;
-  lng: number;
-  /** line ids, e.g. ["red", "green-b"] */
-  lines: string[];
+export interface Station extends StationBase {
+  /** GTFS route ids, e.g. ["Green-B", "Green-C"] */
+  routes: string[];
   wheelchair: boolean;
   municipality: string | null;
 }
 
-export interface Line {
-  id: string;
+export interface LineBranch {
+  /** GTFS route id, e.g. "Green-D", "Mattapan", "741" */
   routeId: string;
   name: string;
-  short: string;
-  /** red | orange | blue | green | mattapan | silver */
-  group: string;
-  color: string;
-  textColor: string;
-  /** ordered station ids of the longest branch */
+  terminus: string;
+  /** ordered station ids */
   stops: string[];
-  branches: { terminus: string; stops: string[]; shape: [number, number][] }[];
+  /** scheduled minutes from stops[i] to stops[i + 1] */
+  segmentMinutes: number[];
+  totalMinutes: number;
+  /** [lat, lng] track geometry for drawing */
+  shape: [number, number][];
 }
 
-export interface Craving {
-  id: string;
+export interface Line extends LineBase {
+  branches: LineBranch[];
+}
+
+export interface CravingInfo {
+  id: Craving;
   label: string;
   emoji: string;
 }
 
-export interface Restaurant {
-  id: string;
-  name: string;
-  lat: number;
-  lng: number;
-  neighborhood: string;
+export interface Restaurant extends RestaurantBase {
   neighborhoodName: string;
   amenity: string;
+  /** raw OSM cuisine values */
   cuisine: string[];
-  craving: string;
-  cravings: string[];
-  price: PriceTier;
+  /** every craving this place fits; `craving` is the primary one */
+  cravings: Craving[];
+  /** finer category, e.g. "korean", "italian" (these roll up into craving "other") */
+  category: string;
+  categoryLabel: string;
   priceLabel: string;
+  /** true when the price tier was estimated (OSM rarely has price tags) */
   priceEstimated: boolean;
-  isChain: boolean;
   brand: string | null;
   address: string | null;
   website: string | null;
@@ -74,7 +84,7 @@ export interface Restaurant {
   openingHours: string | null;
   diet: { vegetarian: boolean; vegan: boolean; glutenFree: boolean };
   wheelchair: string | null;
-  nearestStation: { id: string; name: string; lines: string[]; distanceM: number; walkMin: number };
+  nearestStation: { id: string; name: string; lines: LineId[]; distanceM: number; walkMin: number };
   osm: string;
 }
 
@@ -82,10 +92,10 @@ export const neighborhoods = neighborhoodsJson as unknown as FeatureCollection<
   Polygon | MultiPolygon,
   NeighborhoodProps
 >;
-export const stations = stationsJson as Station[];
+export const stations = stationsJson as unknown as Station[];
 export const lines = linesJson as unknown as Line[];
 export const restaurants = restaurantsJson as unknown as Restaurant[];
-export const cravings = cravingsJson as Craving[];
+export const cravings = cravingsJson as unknown as CravingInfo[];
 
 export const neighborhoodById = new Map(neighborhoods.features.map((f) => [f.properties.id, f]));
 export const stationById = new Map(stations.map((s) => [s.id, s]));
@@ -96,25 +106,19 @@ export const cravingById = new Map(cravings.map((c) => [c.id, c]));
 export const getRestaurant = (id: string) => restaurantById.get(id);
 export const restaurantsIn = (hoodId: string) => restaurants.filter((r) => r.neighborhood === hoodId);
 
-/** Restaurants needed in a neighborhood to unlock it. */
-export const UNLOCK_THRESHOLD = 3;
+export const LINE_ORDER: LineId[] = ["red", "orange", "green", "blue", "silver"];
+export const LINE_SHORT: Record<LineId, string> = { red: "R", orange: "O", green: "G", blue: "B", silver: "SL" };
 
-export const BOSTON_CENTER: [number, number] = [42.3505, -71.0759];
 export const BOSTON_BOUNDS: [[number, number], [number, number]] = [
   [42.227, -71.191],
   [42.4, -70.986],
 ];
 
-/** Color for a line id (falls back to T silver). */
-export function lineColor(lineId: string): string {
-  return lineById.get(lineId)?.color ?? "#7C878E";
-}
+export const lineColor = (id: LineId): string => LINE_COLORS[id] ?? LINE_COLORS.silver;
 
-/** One color per line *group* (all Green branches share green), for station dots. */
-export function stationColor(s: Pick<Station, "lines">): string {
-  const groups = new Set(s.lines.map((l) => lineById.get(l)?.group ?? l));
-  if (groups.size > 1) return "#ffffff"; // transfer station
-  return lineColor(s.lines[0]);
+/** Station dot color: its line color, or white for transfer stations. */
+export function stationColor(s: Pick<StationBase, "lines">): string {
+  return s.lines.length > 1 ? "#ffffff" : lineColor(s.lines[0]);
 }
 
 /** Great-circle distance in meters. */
@@ -127,8 +131,29 @@ export function distanceM(a: { lat: number; lng: number }, b: { lat: number; lng
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
+// Used by /api/checkin (from the team skeleton). Keep these signatures stable.
+export function distanceMeters(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  return distanceM({ lat: aLat, lng: aLng }, { lat: bLat, lng: bLng });
+}
+
+export function distanceKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
+  return distanceMeters(aLat, aLng, bLat, bLng) / 1000;
+}
+
 /** Rough walking minutes for a straight-line distance (street grid ≈ 1.3× crow-flies, 80 m/min). */
 export const walkMinutes = (meters: number) => Math.max(1, Math.round((meters * 1.3) / 80));
+
+/** Scheduled minutes riding between two stations on the same branch (null if not on one branch). */
+export function rideMinutes(lineId: LineId, fromStopId: string, toStopId: string): number | null {
+  for (const b of lineById.get(lineId)?.branches ?? []) {
+    const i = b.stops.indexOf(fromStopId);
+    const j = b.stops.indexOf(toStopId);
+    if (i < 0 || j < 0) continue;
+    const [a, z] = i < j ? [i, j] : [j, i];
+    return b.segmentMinutes.slice(a, z).reduce((s, m) => s + m, 0);
+  }
+  return null;
+}
 
 function pointInRing(lng: number, lat: number, ring: number[][]): boolean {
   let inside = false;
@@ -141,7 +166,7 @@ function pointInRing(lng: number, lat: number, ring: number[][]): boolean {
 }
 
 /** Which neighborhood a point is in (null if outside Boston). */
-export function neighborhoodAt(lat: number, lng: number): Neighborhood | null {
+export function neighborhoodAt(lat: number, lng: number): NeighborhoodFeature | null {
   for (const f of neighborhoods.features) {
     const polys = f.geometry.type === "Polygon" ? [f.geometry.coordinates] : f.geometry.coordinates;
     for (const [outer, ...holes] of polys) {
@@ -152,7 +177,7 @@ export function neighborhoodAt(lat: number, lng: number): Neighborhood | null {
 }
 
 /** [[south, west], [north, east]] for a neighborhood, for map.fitBounds. */
-export function neighborhoodBounds(f: Neighborhood): [[number, number], [number, number]] {
+export function neighborhoodBounds(f: NeighborhoodFeature): [[number, number], [number, number]] {
   let s = 90, w = 180, n = -90, e = -180;
   const polys = f.geometry.type === "Polygon" ? [f.geometry.coordinates] : f.geometry.coordinates;
   for (const poly of polys)
@@ -169,10 +194,12 @@ export type LocationFilter =
   | { kind: "neighborhood"; id: string };
 
 export interface RestaurantFilters {
-  /** craving ids; empty = all */
-  cravings: string[];
-  /** price tiers; empty = all */
+  /** empty = all */
+  cravings: Craving[];
+  /** empty = all */
   prices: PriceTier[];
+  /** nearest station is on one of these lines; empty = all */
+  lines: LineId[];
   location: LocationFilter;
   hideChains: boolean;
 }
@@ -180,6 +207,7 @@ export interface RestaurantFilters {
 export const DEFAULT_FILTERS: RestaurantFilters = {
   cravings: [],
   prices: [],
+  lines: [],
   location: { kind: "anywhere" },
   hideChains: false,
 };
@@ -188,6 +216,7 @@ export function filterRestaurants(list: Restaurant[], f: RestaurantFilters): Res
   return list.filter((r) => {
     if (f.cravings.length && !r.cravings.some((c) => f.cravings.includes(c))) return false;
     if (f.prices.length && !f.prices.includes(r.price)) return false;
+    if (f.lines.length && !r.nearestStation.lines.some((l) => f.lines.includes(l))) return false;
     if (f.hideChains && r.isChain) return false;
     if (f.location.kind === "neighborhood" && r.neighborhood !== f.location.id) return false;
     if (f.location.kind === "near" && distanceM(r, f.location) > f.location.radiusM) return false;
@@ -199,16 +228,8 @@ export function activeFilterCount(f: RestaurantFilters): number {
   return (
     (f.cravings.length ? 1 : 0) +
     (f.prices.length ? 1 : 0) +
+    (f.lines.length ? 1 : 0) +
     (f.location.kind !== "anywhere" ? 1 : 0) +
     (f.hideChains ? 1 : 0)
   );
-}
-
-// Used by /api/checkin (from the team skeleton). Keep these signatures stable.
-export function distanceMeters(aLat: number, aLng: number, bLat: number, bLng: number): number {
-  return distanceM({ lat: aLat, lng: aLng }, { lat: bLat, lng: bLng });
-}
-
-export function distanceKm(aLat: number, aLng: number, bLat: number, bLng: number): number {
-  return distanceMeters(aLat, aLng, bLat, bLng) / 1000;
 }

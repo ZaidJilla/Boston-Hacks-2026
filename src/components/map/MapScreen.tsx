@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
+import { DEMO_MODE } from "@/lib/config";
 import {
   DEFAULT_FILTERS,
   filterRestaurants,
@@ -16,14 +17,17 @@ import {
 import FogMap, { boundsFor, type FlyTarget } from "./FogMap";
 import FilterSheet from "./FilterSheet";
 import RestaurantCard from "./RestaurantCard";
-import { DEMO_MODE, useUser } from "./useUser";
+import { useUnlocked } from "./useUnlocked";
 
 const TOTAL_HOODS = neighborhoods.features.length;
 
+/** Straight-line distance from downtown, used to reject "near me" when the user isn't in Boston. */
+function distanceFromBoston(lat: number, lng: number) {
+  return Math.hypot((lat - 42.3505) * 111000, (lng + 71.0759) * 82000);
+}
+
 export default function MapScreen() {
-  const { user } = useUser();
-  const unlocked = useMemo(() => new Set(user?.unlockedNeighborhoods ?? []), [user]);
-  const checkins = useMemo(() => new Set(user?.checkins ?? []), [user]);
+  const { unlocked, checkins } = useUnlocked();
 
   const [filters, setFilters] = useState<RestaurantFilters>(DEFAULT_FILTERS);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -61,14 +65,14 @@ export default function MapScreen() {
           setLocating(false);
           const { latitude: lat, longitude: lng } = p.coords;
           if (!neighborhoodAt(lat, lng) && distanceFromBoston(lat, lng) > 15000) {
-            setLocateError("You're not in Boston — pick a neighborhood instead.");
+            setLocateError("You're not in Boston. Pick a neighborhood instead.");
             return;
           }
           apply(lat, lng);
         },
         (err) => {
           setLocating(false);
-          setLocateError(err.code === err.PERMISSION_DENIED ? "Location permission denied." : "Couldn't find you.");
+          setLocateError(err.code === err.PERMISSION_DENIED ? "Location permission was denied." : "Couldn't find you.");
         },
         { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
       );
@@ -76,11 +80,22 @@ export default function MapScreen() {
     [filters, userPos, changeFilters],
   );
 
+  const selectHood = useCallback((id: string) => {
+    setHoodInfo(id);
+    setSelected(null);
+  }, []);
+  const clearSelection = useCallback(() => {
+    setSelected(null);
+    setHoodInfo(null);
+  }, []);
+
   const hood = hoodInfo ? neighborhoodById.get(hoodInfo) : null;
-  const hoodEaten = hood ? restaurantsIn(hood.properties.id).filter((r) => checkins.has(r.id)).length : 0;
+  const hoodSpots = hood ? restaurantsIn(hood.properties.id) : [];
+  const hoodEaten = hoodSpots.filter((r) => checkins.has(r.id)).length;
 
   return (
-    <main className="relative h-[100dvh] w-full overflow-hidden bg-slate-200">
+    // fills the screen above the app's bottom nav (h-14)
+    <div className="fixed inset-x-0 bottom-14 top-0 overflow-hidden bg-fog">
       <FogMap
         restaurants={visible}
         unlocked={unlocked}
@@ -92,45 +107,38 @@ export default function MapScreen() {
           setHoodInfo(null);
           setSheetOpen(false);
         }}
-        onSelectNeighborhood={(id) => {
-          setHoodInfo(id);
-          setSelected(null);
-        }}
-        onMapTap={() => {
-          setSelected(null);
-          setHoodInfo(null);
-        }}
+        onSelectNeighborhood={selectHood}
+        onMapTap={clearSelection}
       />
 
-      {/* Top bar */}
       <header className="pointer-events-none absolute inset-x-0 top-0 z-[1000] flex items-start justify-between gap-2 p-3 pt-[calc(env(safe-area-inset-top)+12px)]">
-        <div className="pointer-events-auto rounded-2xl bg-white/95 px-3.5 py-2 shadow-md ring-1 ring-slate-200 backdrop-blur">
-          <p className="text-sm font-extrabold tracking-tight text-slate-900">🌫️ Boston Fog</p>
-          <p className="text-xs text-slate-500">
-            <span className="font-semibold text-slate-800">{unlocked.size}</span>/{TOTAL_HOODS} neighborhoods unlocked
+        <div className="pointer-events-auto rounded-2xl bg-white/95 px-3.5 py-2 shadow-md ring-1 ring-black/10">
+          <p className="text-sm text-ink">
+            <span className="font-bold">{unlocked.size}</span> of {TOTAL_HOODS} neighborhoods unlocked
           </p>
+          <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-black/10" aria-hidden>
+            <div className="h-full bg-line-green" style={{ width: `${(unlocked.size / TOTAL_HOODS) * 100}%` }} />
+          </div>
         </div>
         {DEMO_MODE && (
-          <span className="pointer-events-auto rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800 shadow-sm">
+          <span className="pointer-events-auto rounded-full bg-line-orange px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm">
             Demo
           </span>
         )}
       </header>
 
       {hood && !selected && (
-        <div className="fixed inset-x-3 bottom-[104px] z-[1001] mx-auto max-w-md rounded-2xl bg-white p-4 shadow-xl ring-1 ring-slate-200">
-          <p className="text-xs font-medium text-slate-500">
-            {unlocked.has(hood.properties.id) ? "Unlocked ✓" : "Still foggy 🌫️"}
-          </p>
-          <h2 className="text-lg font-bold text-slate-900">{hood.properties.name}</h2>
-          <p className="text-sm text-slate-600">
-            {restaurantsIn(hood.properties.id).length} spots
+        <div className="fixed inset-x-3 bottom-[164px] z-[1001] mx-auto max-w-md rounded-2xl bg-white p-4 shadow-xl ring-1 ring-black/10">
+          <p className="text-xs font-medium text-ink/60">{unlocked.has(hood.properties.id) ? "Unlocked" : "Still foggy"}</p>
+          <h2 className="text-lg font-bold text-ink">{hood.properties.name}</h2>
+          <p className="text-sm text-ink/70">
+            {hoodSpots.length} spots
             {!unlocked.has(hood.properties.id) &&
               ` · eat at ${Math.max(0, UNLOCK_THRESHOLD - hoodEaten)} more to unlock`}
           </p>
           <button
             type="button"
-            className="mt-3 min-h-[44px] w-full rounded-xl bg-slate-900 text-sm font-semibold text-white"
+            className="mt-3 min-h-[44px] w-full rounded-xl bg-ink text-sm font-semibold text-white"
             onClick={() => {
               changeFilters({ ...filters, location: { kind: "neighborhood", id: hood.properties.id } });
               setHoodInfo(null);
@@ -156,12 +164,6 @@ export default function MapScreen() {
         locating={locating}
         locateError={locateError}
       />
-    </main>
+    </div>
   );
-}
-
-function distanceFromBoston(lat: number, lng: number) {
-  const dLat = (lat - 42.3505) * 111000;
-  const dLng = (lng + 71.0759) * 82000;
-  return Math.hypot(dLat, dLng);
 }

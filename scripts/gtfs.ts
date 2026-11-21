@@ -152,7 +152,7 @@ async function main() {
       const ordered = st.sort((a, b) => a.seq - b.seq).filter((s, i, a) => s.station !== a[i - 1]?.station);
       const seq = ordered.map((s) => s.station);
       const key = seq.join("|");
-      const p = patterns.get(key) ?? { stops: seq, count: 0, shapes: new Map(), hops: seq.slice(1).map(() => []) };
+      const p = patterns.get(key) ?? { stops: seq, count: 0, shapes: new Map(), hops: seq.slice(1).map((): number[] => []) };
       p.count++;
       ordered.slice(1).forEach((s, i) => p.hops[i].push(s.arr - ordered[i].dep));
       if (t.shape_id) p.shapes.set(t.shape_id, (p.shapes.get(t.shape_id) ?? 0) + 1);

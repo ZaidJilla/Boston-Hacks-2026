@@ -4,7 +4,10 @@ import {
   activeFilterCount,
   cravings,
   DEFAULT_FILTERS,
+  LINE_ORDER,
+  lineColor,
   neighborhoods,
+  type LineId,
   type PriceTier,
   type RestaurantFilters,
 } from "@/lib/geo";
@@ -27,18 +30,31 @@ const RADII = [
   { m: 1200, label: "15 min" },
 ];
 
+const LINE_LABEL: Record<LineId, string> = { red: "Red", orange: "Orange", green: "Green", blue: "Blue", silver: "Silver" };
+
 const hoodOptions = [...neighborhoods.features]
   .map((f) => f.properties)
   .sort((a, b) => a.name.localeCompare(b.name));
 
-function Chip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+function Chip({
+  active,
+  onClick,
+  children,
+  activeColor,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  activeColor?: string;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      className={`min-h-[40px] shrink-0 rounded-full border px-3.5 text-sm font-medium transition-colors ${
-        active ? "border-slate-900 bg-slate-900 text-white" : "border-slate-300 bg-white text-slate-700 active:bg-slate-100"
+      style={active && activeColor ? { background: activeColor, borderColor: activeColor } : undefined}
+      className={`min-h-[44px] shrink-0 rounded-full border px-3.5 text-sm font-medium transition-colors ${
+        active ? "border-ink bg-ink text-white" : "border-black/20 bg-white text-ink active:bg-black/5"
       }`}
     >
       {children}
@@ -49,7 +65,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="space-y-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h3>
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-ink/60">{title}</h3>
       {children}
     </section>
   );
@@ -71,9 +87,10 @@ export default function FilterSheet({
   const loc = filters.location;
 
   return (
+    // sits on top of the app's bottom nav (h-14)
     <div
-      className={`fixed inset-x-0 bottom-0 z-[1000] mx-auto flex max-w-md flex-col overflow-hidden rounded-t-3xl bg-white shadow-[0_-8px_30px_rgba(15,23,42,0.18)] transition-[max-height] duration-300 ${
-        open ? "max-h-[78dvh]" : "max-h-[92px]"
+      className={`fixed inset-x-0 bottom-14 z-[1001] mx-auto flex max-w-md flex-col overflow-hidden rounded-t-3xl bg-white shadow-[0_-8px_30px_rgba(20,24,28,0.18)] transition-[max-height] duration-300 ${
+        open ? "max-h-[calc(100dvh-8rem)]" : "max-h-[92px]"
       }`}
     >
       {/* Handle + summary: the whole row toggles the sheet */}
@@ -83,20 +100,20 @@ export default function FilterSheet({
         aria-expanded={open}
         className="flex w-full flex-col items-center px-5 pb-3 pt-2"
       >
-        <span className="mb-2 h-1.5 w-10 rounded-full bg-slate-300" />
+        <span className="mb-2 h-1.5 w-10 rounded-full bg-black/20" />
         <span className="flex w-full items-center justify-between">
           <span className="text-left">
-            <span className="block text-base font-bold text-slate-900">
+            <span className="block text-base font-bold text-ink">
               {resultCount} {resultCount === 1 ? "spot" : "spots"}
             </span>
-            <span className="block text-xs text-slate-500">
+            <span className="block text-xs text-ink/60">
               {count ? `${count} filter${count > 1 ? "s" : ""} on` : "What are you craving?"}
             </span>
           </span>
-          <span className="flex min-h-[44px] items-center gap-1.5 rounded-full bg-slate-900 px-4 text-sm font-semibold text-white">
+          <span className="flex min-h-[44px] items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white">
             {open ? "Done" : "Filters"}
             {!open && count > 0 && (
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[11px]">{count}</span>
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-line-red text-[11px]">{count}</span>
             )}
           </span>
         </span>
@@ -128,7 +145,7 @@ export default function FilterSheet({
                   onClick={() => onChange({ ...filters, prices: toggle(filters.prices, p) })}
                 >
                   {"$".repeat(p)}
-                  <span className="ml-1 text-xs opacity-70">{p === 1 ? "<$15" : p === 2 ? "$15–30" : "$30+"}</span>
+                  <span className="ml-1 text-xs opacity-70">{p === 1 ? "under $15" : p === 2 ? "$15–30" : "$30+"}</span>
                 </Chip>
               ))}
             </div>
@@ -140,7 +157,7 @@ export default function FilterSheet({
                 Anywhere
               </Chip>
               <Chip active={loc.kind === "near"} onClick={() => onNearMe(loc.kind === "near" ? loc.radiusM : 800)}>
-                {locating ? "Locating…" : "📍 Near me"}
+                {locating ? "Locating…" : "Near me"}
               </Chip>
               <Chip
                 active={loc.kind === "neighborhood"}
@@ -159,58 +176,88 @@ export default function FilterSheet({
               <div className="flex gap-2">
                 {RADII.map((r) => (
                   <Chip key={r.m} active={loc.radiusM === r.m} onClick={() => onNearMe(r.m)}>
-                    🚶 {r.label}
+                    {r.label} walk
                   </Chip>
                 ))}
               </div>
             )}
-            {locateError && <p className="text-sm text-rose-600">{locateError}</p>}
+            {locateError && (
+              <p role="alert" className="text-sm text-line-red">
+                {locateError}
+              </p>
+            )}
 
             {loc.kind === "neighborhood" && (
-              <select
-                value={loc.id}
-                onChange={(e) => onChange({ ...filters, location: { kind: "neighborhood", id: e.target.value } })}
-                className="min-h-[44px] w-full rounded-xl border border-slate-300 bg-white px-3 text-base"
-              >
-                {hoodOptions.map((h) => (
-                  <option key={h.id} value={h.id}>
-                    {unlocked.has(h.id) ? "✓ " : "🌫️ "}
-                    {h.name}
-                  </option>
-                ))}
-              </select>
+              <>
+                <label htmlFor="hood" className="sr-only">
+                  Neighborhood
+                </label>
+                <select
+                  id="hood"
+                  value={loc.id}
+                  onChange={(e) => onChange({ ...filters, location: { kind: "neighborhood", id: e.target.value } })}
+                  className="min-h-[44px] w-full rounded-xl border border-black/20 bg-white px-3 text-base"
+                >
+                  {hoodOptions.map((h) => (
+                    <option key={h.id} value={h.id}>
+                      {h.name}
+                      {unlocked.has(h.id) ? " (unlocked)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </>
             )}
           </Section>
 
-          <label className="flex min-h-[44px] items-center justify-between rounded-xl bg-slate-50 px-3">
-            <span className="text-sm font-medium text-slate-700">Local spots only (hide chains)</span>
+          <Section title="T line">
+            <div className="flex flex-wrap gap-2">
+              {LINE_ORDER.map((l) => (
+                <Chip
+                  key={l}
+                  active={filters.lines.includes(l)}
+                  activeColor={lineColor(l)}
+                  onClick={() => onChange({ ...filters, lines: toggle(filters.lines, l) })}
+                >
+                  <span
+                    aria-hidden
+                    className="mr-1.5 inline-block h-2.5 w-2.5 rounded-full align-middle"
+                    style={{ background: filters.lines.includes(l) ? "#fff" : lineColor(l) }}
+                  />
+                  {LINE_LABEL[l]}
+                </Chip>
+              ))}
+            </div>
+          </Section>
+
+          <label className="flex min-h-[44px] items-center justify-between rounded-xl bg-paper px-3">
+            <span className="text-sm font-medium text-ink">Local spots only (hide chains)</span>
             <input
               type="checkbox"
               checked={filters.hideChains}
               onChange={(e) => onChange({ ...filters, hideChains: e.target.checked })}
-              className="h-5 w-5 accent-slate-900"
+              className="h-5 w-5 accent-ink"
             />
           </label>
         </div>
       )}
 
       {open && (
-          <div className="flex gap-2 border-t border-slate-100 bg-white px-5 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3">
-            <button
-              type="button"
-              onClick={() => onChange(DEFAULT_FILTERS)}
-              className="min-h-[48px] flex-1 rounded-2xl border border-slate-300 text-sm font-semibold text-slate-700"
-            >
-              Reset
-            </button>
-            <button
-              type="button"
-              onClick={() => onOpenChange(false)}
-              className="min-h-[48px] flex-[2] rounded-2xl bg-rose-600 text-sm font-semibold text-white"
-            >
-              Show {resultCount} spots
-            </button>
-          </div>
+        <div className="flex gap-2 border-t border-black/5 bg-white px-5 pb-3 pt-3">
+          <button
+            type="button"
+            onClick={() => onChange(DEFAULT_FILTERS)}
+            className="min-h-[48px] flex-1 rounded-2xl border border-black/20 text-sm font-semibold text-ink"
+          >
+            Reset
+          </button>
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="min-h-[48px] flex-[2] rounded-2xl bg-line-blue text-sm font-semibold text-white"
+          >
+            Show {resultCount} spots
+          </button>
+        </div>
       )}
     </div>
   );

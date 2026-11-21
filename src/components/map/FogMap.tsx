@@ -1,13 +1,12 @@
 "use client";
 
-import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useEffect, useMemo, useState } from "react";
 import { CircleMarker, GeoJSON, MapContainer, Pane, Polyline, TileLayer, Tooltip, useMap } from "react-leaflet";
 import type { PathOptions } from "leaflet";
+import { BOSTON_CENTER, LINE_COLORS } from "@/lib/config";
 import {
   BOSTON_BOUNDS,
-  BOSTON_CENTER,
   lines,
   neighborhoodAt,
   neighborhoodBounds,
@@ -15,7 +14,7 @@ import {
   neighborhoods,
   stationColor,
   stations,
-  type Neighborhood,
+  type NeighborhoodFeature,
   type Restaurant,
 } from "@/lib/geo";
 
@@ -35,16 +34,19 @@ interface Props {
   onMapTap: () => void;
 }
 
-// Locked neighborhoods: flat grey wash. Unlocked: clear with a colored edge.
-const FOG: PathOptions = { fillColor: "#64748b", fillOpacity: 0.5, color: "#94a3b8", weight: 1, opacity: 0.8 };
-const clearStyle = (color: string): PathOptions => ({ fillColor: color, fillOpacity: 0.05, color, weight: 3, opacity: 0.95 });
+const INK = "#14181C";
+const FOG_COLOR = "#C9CED3";
+
+// Locked: muted grey wash. Unlocked: clear, with a colored edge (T green = progress).
+const FOG: PathOptions = { fillColor: "#8A939B", fillOpacity: 0.55, color: "#7C878E", weight: 1, opacity: 0.7 };
+const CLEAR: PathOptions = { fillColor: LINE_COLORS.green, fillOpacity: 0.04, color: LINE_COLORS.green, weight: 3, opacity: 1 };
 
 function Flyer({ target }: { target: FlyTarget }) {
   const map = useMap();
   useEffect(() => {
     if (!target) return;
-    // leave room at the bottom for the sheet
-    const pad = { paddingTopLeft: [24, 80] as [number, number], paddingBottomRight: [24, 180] as [number, number] };
+    // leave room for the top bar and the filter sheet
+    const pad = { paddingTopLeft: [24, 80] as [number, number], paddingBottomRight: [24, 120] as [number, number] };
     if (target.kind === "bounds") map.flyToBounds(target.bounds, { ...pad, duration: 0.8 });
     else map.flyTo([target.lat, target.lng], target.zoom, { duration: 0.8 });
   }, [map, target]);
@@ -62,6 +64,26 @@ function useZoom() {
     };
   }, [map]);
   return zoom;
+}
+
+/**
+ * Marker canvases sit above the fog layer and swallow taps, so neighborhood taps are
+ * resolved here from the tap point instead of via polygon click handlers.
+ */
+function TapCatcher({ onHood, onEmpty }: { onHood: (id: string) => void; onEmpty: () => void }) {
+  const map = useMap();
+  useEffect(() => {
+    const handler = (e: L.LeafletMouseEvent) => {
+      const hood = neighborhoodAt(e.latlng.lat, e.latlng.lng);
+      if (hood) onHood(hood.properties.id);
+      else onEmpty();
+    };
+    map.on("click", handler);
+    return () => {
+      map.off("click", handler);
+    };
+  }, [map, onHood, onEmpty]);
+  return null;
 }
 
 function FoodMarkers({
@@ -88,13 +110,14 @@ function FoodMarkers({
           <CircleMarker
             key={r.id}
             center={[r.lat, r.lng]}
-            radius={selected ? base + 4 : isOpen ? base : base - 0.5}
+            radius={selected ? base + 4 : base}
             pathOptions={{
               renderer,
-              color: "#ffffff",
+              // unlocked spots are solid ink; fogged ones are hollow so they read as "not yet"
+              color: selected ? "#ffffff" : INK,
               weight: selected ? 3 : base <= 3 ? 1 : 1.5,
-              fillColor: selected ? "#0f172a" : isOpen ? "#e11d48" : "#334155",
-              fillOpacity: isOpen || selected ? 1 : 0.7,
+              fillColor: selected ? LINE_COLORS.blue : isOpen ? INK : "#ffffff",
+              fillOpacity: 1,
             }}
             eventHandlers={{
               click: (e) => {
@@ -107,26 +130,6 @@ function FoodMarkers({
       })}
     </>
   );
-}
-
-/**
- * Marker canvases sit above the fog layer and swallow taps, so neighborhood taps are
- * resolved here from the tap point instead of via polygon click handlers.
- */
-function TapCatcher({ onHood, onEmpty }: { onHood: (id: string) => void; onEmpty: () => void }) {
-  const map = useMap();
-  useEffect(() => {
-    const handler = (e: L.LeafletMouseEvent) => {
-      const hood = neighborhoodAt(e.latlng.lat, e.latlng.lng);
-      if (hood) onHood(hood.properties.id);
-      else onEmpty();
-    };
-    map.on("click", handler);
-    return () => {
-      map.off("click", handler);
-    };
-  }, [map, onHood, onEmpty]);
-  return null;
 }
 
 export default function FogMap({
@@ -149,28 +152,27 @@ export default function FogMap({
     [],
   );
 
-  const hoodStyle = (f?: Neighborhood) =>
-    f && unlocked.has(f.properties.id) ? clearStyle(f.properties.color) : FOG;
+  const hoodStyle = (f?: NeighborhoodFeature) => (f && unlocked.has(f.properties.id) ? CLEAR : FOG);
 
   return (
     <MapContainer
       center={BOSTON_CENTER}
       zoom={13}
       minZoom={11}
-      maxZoom={16}
+      maxZoom={18}
       maxBounds={[
         [BOSTON_BOUNDS[0][0] - 0.08, BOSTON_BOUNDS[0][1] - 0.12],
         [BOSTON_BOUNDS[1][0] + 0.08, BOSTON_BOUNDS[1][1] + 0.12],
       ]}
       zoomControl={false}
-      attributionControl
-      className="h-full w-full"
+      // mute the OSM tiles so the fog and T colors carry the map
+      className="h-full w-full [&_.leaflet-tile-pane]:opacity-80 [&_.leaflet-tile-pane]:grayscale-[70%]"
+      style={{ background: FOG_COLOR }}
     >
       <TileLayer
-        // keyless, muted basemap so the fog and T colors stand out
-        url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
-        attribution='Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors | Data: <a href="https://www.openstreetmap.org/copyright">OSM</a>, MBTA, City of Boston'
-        maxZoom={16}
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · MBTA · City of Boston'
+        maxZoom={19}
       />
       <Flyer target={flyTo} />
       <TapCatcher onHood={onSelectNeighborhood} onEmpty={onMapTap} />
@@ -187,11 +189,11 @@ export default function FogMap({
 
       <Pane name="lines" style={{ zIndex: 410, pointerEvents: "none" }}>
         {lines.flatMap((l) =>
-          l.branches.map((b, i) => (
+          l.branches.map((b) => (
             <Polyline
-              key={`${l.id}-${i}`}
+              key={`${l.id}-${b.routeId}-${b.terminus}`}
               positions={b.shape}
-              pathOptions={{ color: l.color, weight: 3, opacity: 0.75, interactive: false, renderer: renderers.lines }}
+              pathOptions={{ color: l.color, weight: 4, opacity: 0.9, interactive: false, renderer: renderers.lines }}
             />
           )),
         )}
@@ -199,8 +201,7 @@ export default function FogMap({
 
       <Pane name="stations" style={{ zIndex: 420 }}>
         {stations.map((s) => {
-          const fill = stationColor(s);
-          const transfer = fill === "#ffffff";
+          const transfer = s.lines.length > 1;
           return (
             <CircleMarker
               key={s.id}
@@ -208,9 +209,9 @@ export default function FogMap({
               radius={transfer ? 5 : 4}
               pathOptions={{
                 renderer: renderers.stations,
-                color: transfer ? "#0f172a" : "#ffffff",
+                color: transfer ? INK : "#ffffff",
                 weight: transfer ? 2 : 1.5,
-                fillColor: fill,
+                fillColor: stationColor(s),
                 fillOpacity: 1,
               }}
             >
@@ -237,7 +238,7 @@ export default function FogMap({
           <CircleMarker
             center={[userPos.lat, userPos.lng]}
             radius={8}
-            pathOptions={{ color: "#ffffff", weight: 3, fillColor: "#2563eb", fillOpacity: 1, interactive: false }}
+            pathOptions={{ color: "#ffffff", weight: 3, fillColor: LINE_COLORS.blue, fillOpacity: 1, interactive: false }}
           />
         </Pane>
       )}
