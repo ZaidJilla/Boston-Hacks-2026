@@ -43,26 +43,47 @@ const KNOWN_CHAINS = new Set(
   ].map(slugify),
 );
 
-// craving id → OSM cuisine values. Order matters: first match is the primary craving.
-const CRAVINGS: { id: string; label: string; emoji: string; cuisines: string[] }[] = [
-  { id: "pizza", label: "Pizza", emoji: "🍕", cuisines: ["pizza"] },
-  { id: "burgers", label: "Burgers", emoji: "🍔", cuisines: ["burger", "hot_dog"] },
-  { id: "chicken", label: "Chicken", emoji: "🍗", cuisines: ["chicken", "wings", "fried_chicken"] },
-  { id: "tacos", label: "Tacos & Latin", emoji: "🌮", cuisines: ["mexican", "tex-mex", "tacos", "burrito", "latin_american", "colombian", "peruvian", "venezuelan", "salvadoran", "brazilian", "caribbean", "cuban", "dominican", "puerto_rican", "haitian", "jamaican", "argentinian"] },
-  { id: "sushi", label: "Sushi & Japanese", emoji: "🍣", cuisines: ["sushi", "japanese", "ramen", "poke", "udon"] },
-  { id: "chinese", label: "Chinese", emoji: "🥟", cuisines: ["chinese", "dim_sum", "hotpot", "hot_pot", "cantonese", "szechuan", "sichuan", "taiwanese", "dumpling", "mongolian", "shanghai"] },
-  { id: "korean", label: "Korean", emoji: "🍜", cuisines: ["korean"] },
-  { id: "thai-viet", label: "Thai & Viet", emoji: "🍲", cuisines: ["thai", "vietnamese", "pho", "noodle", "asian", "malaysian", "filipino", "indonesian", "burmese", "cambodian", "laotian"] },
-  { id: "indian", label: "Indian", emoji: "🍛", cuisines: ["indian", "nepalese", "pakistani", "bangladeshi", "himalayan", "tibetan"] },
-  { id: "mediterranean", label: "Mediterranean", emoji: "🥙", cuisines: ["mediterranean", "greek", "middle_eastern", "lebanese", "turkish", "falafel", "kebab", "gyros", "persian", "moroccan", "israeli", "ethiopian", "eritrean", "african", "shawarma"] },
-  { id: "italian", label: "Italian", emoji: "🍝", cuisines: ["italian", "pasta", "italian_pizza"] },
-  { id: "seafood", label: "Seafood", emoji: "🦞", cuisines: ["seafood", "fish", "oyster", "lobster", "fish_and_chips"] },
-  { id: "sandwiches", label: "Sandwiches", emoji: "🥪", cuisines: ["sandwich", "deli", "sub", "bagel", "wrap", "cheesesteak", "jewish"] },
-  { id: "breakfast", label: "Breakfast & Brunch", emoji: "🥞", cuisines: ["breakfast", "brunch", "diner", "crepe", "pancake", "waffle"] },
-  { id: "healthy", label: "Healthy", emoji: "🥗", cuisines: ["salad", "juice", "smoothie", "vegan", "vegetarian", "organic", "bowl", "acai"] },
-  { id: "american", label: "American", emoji: "🍖", cuisines: ["american", "regional", "barbecue", "bbq", "steak_house", "steak", "bar_and_grill", "southern", "local", "new_american", "comfort_food", "grill", "pub"] },
-  { id: "dessert", label: "Dessert & Boba", emoji: "🍦", cuisines: ["ice_cream", "donut", "dessert", "cake", "bubble_tea", "frozen_yogurt", "cupcake", "chocolate", "gelato", "pastry", "cookie"] },
-  { id: "coffee", label: "Coffee & Bakery", emoji: "☕", cuisines: ["coffee_shop", "coffee", "tea", "bakery", "cafe"] },
+/**
+ * The 12 cravings in the shared contract (src/lib/types.ts `Craving`). Filter chips use these.
+ * Labels are wider than the ids so every category below has a sensible home.
+ */
+const CRAVINGS = [
+  { id: "pizza", label: "Pizza", emoji: "🍕" },
+  { id: "burgers", label: "Burgers & chicken", emoji: "🍔" },
+  { id: "tacos", label: "Tacos & Latin", emoji: "🌮" },
+  { id: "ramen", label: "Ramen & sushi", emoji: "🍜" },
+  { id: "chinese", label: "Chinese", emoji: "🥟" },
+  { id: "thai", label: "Thai & Viet", emoji: "🍲" },
+  { id: "indian", label: "Indian", emoji: "🍛" },
+  { id: "seafood", label: "Seafood", emoji: "🦞" },
+  { id: "sandwiches", label: "Sandwiches", emoji: "🥪" },
+  { id: "coffee", label: "Coffee & bakery", emoji: "☕" },
+  { id: "dessert", label: "Dessert & boba", emoji: "🍦" },
+  { id: "other", label: "Everything else", emoji: "🍽️" },
+] as const;
+type Craving = (typeof CRAVINGS)[number]["id"];
+
+// Finer category → OSM cuisine values, and which contract craving it rolls up to.
+// Order matters: the first match is the primary category.
+const CATEGORIES: { id: string; label: string; craving: Craving; cuisines: string[] }[] = [
+  { id: "pizza", label: "Pizza", craving: "pizza", cuisines: ["pizza"] },
+  { id: "burgers", label: "Burgers", craving: "burgers", cuisines: ["burger", "hot_dog"] },
+  { id: "chicken", label: "Chicken", craving: "burgers", cuisines: ["chicken", "wings", "fried_chicken"] },
+  { id: "tacos", label: "Tacos & Latin", craving: "tacos", cuisines: ["mexican", "tex-mex", "tacos", "burrito", "latin_american", "colombian", "peruvian", "venezuelan", "salvadoran", "brazilian", "caribbean", "cuban", "dominican", "puerto_rican", "haitian", "jamaican", "argentinian"] },
+  { id: "sushi", label: "Sushi & Japanese", craving: "ramen", cuisines: ["sushi", "japanese", "ramen", "poke", "udon"] },
+  { id: "chinese", label: "Chinese", craving: "chinese", cuisines: ["chinese", "dim_sum", "hotpot", "hot_pot", "cantonese", "szechuan", "sichuan", "taiwanese", "dumpling", "mongolian", "shanghai"] },
+  { id: "korean", label: "Korean", craving: "other", cuisines: ["korean"] },
+  { id: "thai-viet", label: "Thai & Viet", craving: "thai", cuisines: ["thai", "vietnamese", "pho", "noodle", "asian", "malaysian", "filipino", "indonesian", "burmese", "cambodian", "laotian"] },
+  { id: "indian", label: "Indian", craving: "indian", cuisines: ["indian", "nepalese", "pakistani", "bangladeshi", "himalayan", "tibetan"] },
+  { id: "mediterranean", label: "Mediterranean", craving: "other", cuisines: ["mediterranean", "greek", "middle_eastern", "lebanese", "turkish", "falafel", "kebab", "gyros", "persian", "moroccan", "israeli", "ethiopian", "eritrean", "african", "shawarma"] },
+  { id: "italian", label: "Italian", craving: "other", cuisines: ["italian", "pasta", "italian_pizza"] },
+  { id: "seafood", label: "Seafood", craving: "seafood", cuisines: ["seafood", "fish", "oyster", "lobster", "fish_and_chips"] },
+  { id: "sandwiches", label: "Sandwiches", craving: "sandwiches", cuisines: ["sandwich", "deli", "sub", "bagel", "wrap", "cheesesteak", "jewish"] },
+  { id: "breakfast", label: "Breakfast & Brunch", craving: "other", cuisines: ["breakfast", "brunch", "diner", "crepe", "pancake", "waffle"] },
+  { id: "healthy", label: "Healthy", craving: "other", cuisines: ["salad", "juice", "smoothie", "vegan", "vegetarian", "organic", "bowl", "acai"] },
+  { id: "american", label: "American", craving: "other", cuisines: ["american", "regional", "barbecue", "bbq", "steak_house", "steak", "bar_and_grill", "southern", "local", "new_american", "comfort_food", "grill", "pub"] },
+  { id: "dessert", label: "Dessert & Boba", craving: "dessert", cuisines: ["ice_cream", "donut", "dessert", "cake", "bubble_tea", "frozen_yogurt", "cupcake", "chocolate", "gelato", "pastry", "cookie"] },
+  { id: "coffee", label: "Coffee & Bakery", craving: "coffee", cuisines: ["coffee_shop", "coffee", "tea", "bakery", "cafe"] },
 ];
 
 // cuisines that point to a cheap ($) or pricey ($$$) meal when there's no price tag
@@ -138,10 +159,10 @@ const NAME_HINTS: [RegExp, string][] = [
   [/ice cream|gelato|creamery|boba|bubble tea|donut|dessert/i, "dessert"],
 ];
 
-function cravingsOf(cuisines: string[]): string[] {
+function categoriesOf(cuisines: string[]): string[] {
   const out: string[] = [];
   // walk cuisines in OSM order so the first-listed cuisine decides the primary craving
-  for (const c of cuisines) for (const cr of CRAVINGS) if (cr.cuisines.includes(c) && !out.includes(cr.id)) out.push(cr.id);
+  for (const c of cuisines) for (const cr of CATEGORIES) if (cr.cuisines.includes(c) && !out.includes(cr.id)) out.push(cr.id);
   return out;
 }
 
@@ -206,9 +227,11 @@ async function main() {
       const hoodId = String(hood.properties!.id);
 
       const cuisine = cuisinesOf(t);
-      const cravings = cravingsOf(cuisine);
-      const craving = cravings[0] ?? (t.amenity === "fast_food" ? "burgers" : "american");
-      if (!cravings.length) cravings.push(craving);
+      const categories = categoriesOf(cuisine);
+      if (!categories.length) categories.push(t.amenity === "fast_food" ? "burgers" : "american");
+      const category = CATEGORIES.find((c) => c.id === categories[0])!;
+      const craving: Craving = category.craving;
+      const cravings = [...new Set(categories.map((id) => CATEGORIES.find((c) => c.id === id)!.craving))];
 
       const isChain = Boolean(t.brand || t["brand:wikidata"]) || KNOWN_CHAINS.has(slugify(t.name));
       const price = priceOf(t, cuisine, hoodId);
@@ -232,6 +255,8 @@ async function main() {
         cuisine,
         craving,
         cravings,
+        category: category.id,
+        categoryLabel: category.label,
         price: price.tier,
         priceLabel: "$".repeat(price.tier),
         priceEstimated: price.estimated,
@@ -247,6 +272,7 @@ async function main() {
           glutenFree: ["yes", "only"].includes(t["diet:gluten_free"]),
         },
         wheelchair: t.wheelchair ?? null,
+        nearestStopId: st.id,
         nearestStation: {
           id: st.id,
           name: st.name,
