@@ -1,4 +1,4 @@
-# [NAME]
+# ChewChoo
 
 A map game for Boston college students. The city starts covered in fog. Eat at 3 restaurants in a neighborhood to unlock it, then climb the leaderboards for your city, your college, and each neighborhood. Every spot shows how to get there by T.
 
@@ -23,7 +23,7 @@ Built in 24 hours at BostonHacks 2026.
 | Tiger Data | All game data. Check-ins are a hypertable, leaderboards are SQL queries. |
 | Mastra | The concierge agent, with tools for restaurant search, live arrivals, and routes. |
 | Vultr | The app runs in Docker on a Vultr instance. |
-| GoDaddy Registry | Our domain: TODO |
+| GoDaddy Registry | Our domain: [chewchoo.co](https://chewchoo.co) |
 | DEV | Write-up: TODO |
 | SpaceXSI | Built with Cursor and Grok Bot. |
 
@@ -53,11 +53,11 @@ npm run solana:setup
 ## Deploy
 
 ```
-docker build -t [name] .
-docker run -p 8080:8080 --env-file .env.local [name]
+docker build -t chewchoo .
+docker run -p 8080:8080 --env-file .env.local chewchoo
 ```
 
-On Vultr: create a Cloud Compute instance with Docker, copy the env file, run the container, and point the domain at the instance IP.
+On Vultr: create a Cloud Compute instance with Docker, copy the env file, run the container, and point chewchoo.co at the instance IP.
 
 ## Team
 

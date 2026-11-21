@@ -4,7 +4,7 @@ import { AuthProvider } from "@/lib/auth";
 import BottomNav from "@/components/nav/BottomNav";
 
 export const metadata: Metadata = {
-  title: "[NAME]",
+  title: "ChewChoo",
   description: "Unlock Boston, one neighborhood at a time.",
 };
 export const viewport: Viewport = { width: "device-width", initialScale: 1 };

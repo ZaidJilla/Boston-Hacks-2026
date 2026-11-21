@@ -8,7 +8,7 @@ A mobile-first web app for BostonHacks 2026 (due **9:00 AM Sunday Nov 22**, judg
 
 Boston is split into neighborhoods covered in fog. You unlock a neighborhood by eating at **3 restaurants** in it. Unlocking feeds a ranked system with three leaderboards: citywide, by college, and per neighborhood. Getting around uses the T, so transit is built into every screen.
 
-Working name: **[NAME]** (rename once we claim the domain).
+Name: **ChewChoo**. Domain: **chewchoo.co**.
 
 ## Who it's for
 
