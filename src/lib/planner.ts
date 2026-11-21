@@ -197,8 +197,9 @@ export function plan(
       ride = null;
     }
   }
-  // final walk to the destination
-  walkAcc = ends.get(Math.floor(bestState / (R + 1))) ?? 0;
+  // flush any transfer or start walk still pending, then add the final walk to the destination
+  flushWalk();
+  walkAcc =ends.get(Math.floor(bestState / (R + 1))) ?? 0;
   walkTo = "your destination";
   flushWalk();
 
