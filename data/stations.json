@@ -1,0 +1,7 @@
+[
+  { "id": "place-bbsta", "name": "Back Bay", "lat": 42.34735, "lng": -71.07529, "lines": ["orange"] },
+  { "id": "place-kencl", "name": "Kenmore", "lat": 42.34894, "lng": -71.09708, "lines": ["green"] },
+  { "id": "place-chncl", "name": "Chinatown", "lat": 42.35229, "lng": -71.06288, "lines": ["orange"] },
+  { "id": "place-haecl", "name": "Haymarket", "lat": 42.36303, "lng": -71.05829, "lines": ["orange", "green"] },
+  { "id": "place-rugg", "name": "Ruggles", "lat": 42.33649, "lng": -71.08754, "lines": ["orange"] }
+]

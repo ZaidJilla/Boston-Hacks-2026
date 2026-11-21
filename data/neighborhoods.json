@@ -1,0 +1,13 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    { "type": "Feature", "properties": { "id": "back-bay", "name": "Back Bay" },
+      "geometry": { "type": "Polygon", "coordinates": [[[-71.0905,42.3445],[-71.0700,42.3445],[-71.0700,42.3485],[-71.0905,42.3515],[-71.0905,42.3445]]] } },
+    { "type": "Feature", "properties": { "id": "fenway", "name": "Fenway" },
+      "geometry": { "type": "Polygon", "coordinates": [[[-71.1060,42.3400],[-71.0880,42.3400],[-71.0880,42.3490],[-71.1060,42.3490],[-71.1060,42.3400]]] } },
+    { "type": "Feature", "properties": { "id": "chinatown", "name": "Chinatown" },
+      "geometry": { "type": "Polygon", "coordinates": [[[-71.0640,42.3470],[-71.0570,42.3470],[-71.0570,42.3520],[-71.0640,42.3520],[-71.0640,42.3470]]] } },
+    { "type": "Feature", "properties": { "id": "north-end", "name": "North End" },
+      "geometry": { "type": "Polygon", "coordinates": [[[-71.0620,42.3610],[-71.0510,42.3610],[-71.0510,42.3680],[-71.0620,42.3680],[-71.0620,42.3610]]] } }
+  ]
+}

@@ -1,0 +1,7 @@
+[
+  { "id": "r1", "name": "Sample Pizza", "lat": 42.3470, "lng": -71.0800, "neighborhood": "back-bay", "craving": "pizza", "price": 1, "isChain": false, "nearestStopId": "place-bbsta" },
+  { "id": "r2", "name": "Sample Ramen", "lat": 42.3460, "lng": -71.0850, "neighborhood": "back-bay", "craving": "ramen", "price": 2, "isChain": false, "nearestStopId": "place-bbsta" },
+  { "id": "r3", "name": "Sample Burger Chain", "lat": 42.3480, "lng": -71.0760, "neighborhood": "back-bay", "craving": "burgers", "price": 1, "isChain": true, "nearestStopId": "place-bbsta" },
+  { "id": "r4", "name": "Sample Dumplings", "lat": 42.3495, "lng": -71.0610, "neighborhood": "chinatown", "craving": "chinese", "price": 1, "isChain": false, "nearestStopId": "place-chncl" },
+  { "id": "r5", "name": "Sample Tacos", "lat": 42.3440, "lng": -71.1000, "neighborhood": "fenway", "craving": "tacos", "price": 1, "isChain": false, "nearestStopId": "place-kencl" }
+]

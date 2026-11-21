@@ -1,0 +1,6 @@
+[
+  { "id": "orange", "name": "Orange Line", "color": "#ED8B00", "stopIds": ["place-rugg", "place-bbsta", "place-chncl", "place-haecl"] },
+  { "id": "green", "name": "Green Line", "color": "#00843D", "stopIds": ["place-kencl", "place-haecl"] },
+  { "id": "red", "name": "Red Line", "color": "#DA291C", "stopIds": [] },
+  { "id": "blue", "name": "Blue Line", "color": "#003DA5", "stopIds": [] }
+]
