@@ -72,7 +72,7 @@ export default function FilterSheet({
 
   return (
     <div
-      className={`fixed inset-x-0 bottom-0 z-[1000] mx-auto flex max-w-md flex-col rounded-t-3xl bg-white shadow-[0_-8px_30px_rgba(15,23,42,0.18)] transition-[max-height] duration-300 ${
+      className={`fixed inset-x-0 bottom-0 z-[1000] mx-auto flex max-w-md flex-col overflow-hidden rounded-t-3xl bg-white shadow-[0_-8px_30px_rgba(15,23,42,0.18)] transition-[max-height] duration-300 ${
         open ? "max-h-[78dvh]" : "max-h-[92px]"
       }`}
     >
@@ -103,7 +103,7 @@ export default function FilterSheet({
       </button>
 
       {open && (
-        <div className="flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 pb-[calc(env(safe-area-inset-bottom)+20px)]">
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 pb-4">
           <Section title="Craving">
             <div className="flex flex-wrap gap-2">
               {cravings.map((c) => (
@@ -191,8 +191,11 @@ export default function FilterSheet({
               className="h-5 w-5 accent-slate-900"
             />
           </label>
+        </div>
+      )}
 
-          <div className="sticky bottom-0 -mx-5 flex gap-2 bg-white px-5 pt-2">
+      {open && (
+          <div className="flex gap-2 border-t border-slate-100 bg-white px-5 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3">
             <button
               type="button"
               onClick={() => onChange(DEFAULT_FILTERS)}
@@ -208,7 +211,6 @@ export default function FilterSheet({
               Show {resultCount} spots
             </button>
           </div>
-        </div>
       )}
     </div>
   );

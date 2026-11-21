@@ -9,6 +9,7 @@ import {
   BOSTON_BOUNDS,
   BOSTON_CENTER,
   lines,
+  neighborhoodAt,
   neighborhoodBounds,
   neighborhoodById,
   neighborhoods,
@@ -108,14 +109,23 @@ function FoodMarkers({
   );
 }
 
-function TapCatcher({ onTap }: { onTap: () => void }) {
+/**
+ * Marker canvases sit above the fog layer and swallow taps, so neighborhood taps are
+ * resolved here from the tap point instead of via polygon click handlers.
+ */
+function TapCatcher({ onHood, onEmpty }: { onHood: (id: string) => void; onEmpty: () => void }) {
   const map = useMap();
   useEffect(() => {
-    map.on("click", onTap);
-    return () => {
-      map.off("click", onTap);
+    const handler = (e: L.LeafletMouseEvent) => {
+      const hood = neighborhoodAt(e.latlng.lat, e.latlng.lng);
+      if (hood) onHood(hood.properties.id);
+      else onEmpty();
     };
-  }, [map, onTap]);
+    map.on("click", handler);
+    return () => {
+      map.off("click", handler);
+    };
+  }, [map, onHood, onEmpty]);
   return null;
 }
 
@@ -163,20 +173,15 @@ export default function FogMap({
         maxZoom={16}
       />
       <Flyer target={flyTo} />
-      <TapCatcher onTap={onMapTap} />
+      <TapCatcher onHood={onSelectNeighborhood} onEmpty={onMapTap} />
 
       <Pane name="fog" style={{ zIndex: 400 }}>
         <GeoJSON
           // re-key so Leaflet restyles when the unlocked set changes
           key={[...unlocked].sort().join(",")}
           data={neighborhoods}
+          interactive={false}
           style={hoodStyle as L.StyleFunction}
-          onEachFeature={(f: Neighborhood, layer) => {
-            layer.on("click", (e) => {
-              L.DomEvent.stopPropagation(e);
-              onSelectNeighborhood(f.properties.id);
-            });
-          }}
         />
       </Pane>
 
