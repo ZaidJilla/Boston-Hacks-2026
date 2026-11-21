@@ -108,12 +108,17 @@ export interface RouteStep {
   line?: LineId;
   label: string; // "Walk 4 min" / "Green Line to Kenmore"
   minutes: number;
+  mode?: "walk" | "subway" | "bus";
+  routeShort?: string; // "39", "Orange"
+  color?: string; // hex, from GTFS
 }
 
 export interface RouteResult {
   durationMin: number;
   distanceKm: number;
   steps: RouteStep[];
+  alerts?: string[]; // live MBTA alerts on the routes used
+  source?: "gtfs" | "google" | "estimate";
 }
 
 export interface ReceiptVerdict {

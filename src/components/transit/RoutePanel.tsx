@@ -2,8 +2,8 @@
 // "Get there": transit route from the user's location (or the default campus origin).
 import { useState } from "react";
 import Button from "@/components/ui/Button";
-import type { RouteResult } from "@/lib/types";
-import LineChip from "./LineChip";
+import { LINE_COLORS } from "@/lib/config";
+import type { RouteResult, RouteStep } from "@/lib/types";
 
 function getPosition(): Promise<{ lat: number; lng: number } | undefined> {
   return new Promise((resolve) => {
@@ -46,19 +46,43 @@ export default function RoutePanel({ restaurantId }: { restaurantId: string }) {
       </Button>
       {error && <p role="alert" className="text-sm text-line-red">{error}</p>}
       {route && (
+        <div className="space-y-2">
+          {route.alerts?.map((a, i) => (
+            <p key={i} role="status" className="rounded-lg border border-line-orange bg-line-orange/10 p-3 text-sm">
+              <span className="font-semibold">Service alert: </span>{a}
+            </p>
+          ))}
         <div className="rounded-lg bg-white p-3" role="region" aria-label="Route">
           <p className="font-semibold">{route.durationMin} min · {route.distanceKm} km</p>
           <ol className="mt-2 space-y-2">
             {route.steps.map((s, i) => (
               <li key={i} className="flex items-center gap-2 text-sm">
-                {s.line ? <LineChip line={s.line}>T</LineChip> : <span className="w-8 text-center text-ink/50" aria-hidden>•</span>}
+                <StepBadge step={s} />
                 <span className="flex-1">{s.label}</span>
                 <span className="tabular-nums text-ink/60">{s.minutes} min</span>
               </li>
             ))}
           </ol>
         </div>
+        </div>
       )}
     </div>
+  );
+}
+
+function StepBadge({ step }: { step: RouteStep }) {
+  if (step.mode === "walk" || (!step.line && !step.color)) {
+    return <span className="inline-flex min-w-9 justify-center rounded-full bg-ink/10 px-2 py-0.5 text-xs font-medium text-ink/70">Walk</span>;
+  }
+  const color = step.line ? LINE_COLORS[step.line] : step.color;
+  const text = step.mode === "bus" ? step.routeShort ?? "Bus" : step.line ? step.line[0].toUpperCase() : "T";
+  return (
+    <span
+      className="inline-flex min-w-9 justify-center rounded-full px-2 py-0.5 text-xs font-bold text-white"
+      style={{ backgroundColor: color }}
+      aria-label={step.mode === "bus" ? `Bus ${text}` : "Train"}
+    >
+      {text}
+    </span>
   );
 }
