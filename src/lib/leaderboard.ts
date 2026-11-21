@@ -26,7 +26,9 @@ export async function byCollege(college: string, limit = 50): Promise<Leaderboar
 /** Ranked by distinct restaurants checked into in this neighborhood. */
 export async function byNeighborhood(neighborhood: string, limit = 50): Promise<LeaderboardRow[]> {
   const pool = getPool();
-  if (!pool) return []; // TODO(Person 2): compute from mem.checkins for the demo.
+  // TODO(Raed): in-memory path. Filter mem.checkins by neighborhood, count distinct
+  // restaurantId per uid, join names from mem.users, sort desc, slice(0, limit).
+  if (!pool) return [];
   const { rows } = await pool.query(
     `SELECT u.uid AS id, u.display_name AS name, u.college, COUNT(DISTINCT c.restaurant_id)::int AS points
        FROM checkins c JOIN users u USING (uid)
