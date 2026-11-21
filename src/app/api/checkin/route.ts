@@ -3,13 +3,13 @@
 // -> 5. Solana side effects (after commit, never block) -> 6. respond.
 import { NextResponse } from "next/server";
 import { userFromRequest } from "@/lib/authServer";
-import { DEFAULT_ORIGIN, DEMO_MODE } from "@/lib/config";
-import { getRestaurant, getStation } from "@/lib/data";
-import { distanceKm, distanceMeters } from "@/lib/geo";
+import { DEMO_MODE } from "@/lib/config";
+import { getRestaurant } from "@/lib/data";
+import { distanceMeters } from "@/lib/geo";
 import { verifyReceipt } from "@/lib/gemini";
-import { CHECKIN_RADIUS_M, co2SavedKg } from "@/lib/scoring";
+import { CHECKIN_RADIUS_M } from "@/lib/scoring";
 import { logCheckin, mintBadge } from "@/lib/solana";
-import { getStore } from "@/lib/store";
+import { checkinFacts, getStore } from "@/lib/store";
 import type { CheckinRequest, CheckinResult } from "@/lib/types";
 
 export const runtime = "nodejs"; // pg + firebase-admin need Node, not Edge
@@ -57,9 +57,7 @@ export async function POST(req: Request) {
     if (!verdict.valid) return fail(verdict.reason ?? "Receipt not verified", 422);
   }
 
-  // TODO(Raed): trip distance from the user's real origin (campus or last check-in), not a fixed point.
-  const co2 = co2SavedKg(distanceKm(DEFAULT_ORIGIN.lat, DEFAULT_ORIGIN.lng, r.lat, r.lng), "transit");
-  const lines = getStation(r.nearestStopId)?.lines ?? [];
+  const { lines, co2SavedKg: co2 } = checkinFacts(r);
 
   // 4. Store
   const store = getStore();

@@ -4,6 +4,7 @@ import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { collegeFromEmail } from "./colleges";
 import { DEMO_MODE } from "./config";
+import { DEMO_USER } from "./seedData";
 import type { StoreUser } from "./store";
 
 export async function verifyIdToken(
@@ -27,13 +28,6 @@ export async function verifyIdToken(
     return null;
   }
 }
-
-const DEMO_USER: StoreUser = {
-  uid: "demo-user",
-  displayName: "Demo Student",
-  email: "demo@northeastern.edu",
-  college: "Northeastern",
-};
 
 /**
  * Who is making this request?
@@ -59,7 +53,7 @@ export async function userFromRequest(
   }
 
   if (DEMO_MODE) {
-    // TODO(Raed): once Zaid's CheckinPanel sends the token, consider dropping demoHint.
+    // Body hints only matter while CheckinPanel doesn't send a token yet.
     return {
       uid: demoHint.uid || DEMO_USER.uid,
       displayName: demoHint.displayName || DEMO_USER.displayName,
