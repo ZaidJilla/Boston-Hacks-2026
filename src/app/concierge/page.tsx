@@ -40,8 +40,9 @@ export default function ConciergePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt, history }),
       });
-      const data = (await res.json()) as ConciergeReply;
-      setMessages((m) => [...m, { role: "assistant", content: data.message, picks: data.picks }]);
+      const data = (await res.json()) as Partial<ConciergeReply>;
+      if (!res.ok || !data.message) throw new Error(data.message ?? "bad response");
+      setMessages((m) => [...m, { role: "assistant", content: data.message as string, picks: data.picks }]);
     } catch {
       setMessages((m) => [...m, { role: "assistant", content: "Something went wrong. Try again." }]);
     }
