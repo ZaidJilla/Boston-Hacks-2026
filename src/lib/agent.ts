@@ -9,12 +9,14 @@ import { GEMINI_MODEL } from "./config";
 import { getRestaurant, getStation, restaurants } from "./data";
 import { getArrivals } from "./mbta";
 import { getTransitRoute } from "./routes";
-import { CRAVINGS, LINES, parseQuery, searchRestaurants } from "./search";
+import { CRAVINGS, LINES, NEIGHBORHOOD_IDS, parseQuery, searchWithRelaxation } from "./search";
 import type { Restaurant } from "./types";
 
 export interface ConciergeReply {
   message: string;
   picks: Restaurant[];
+  /** Filters that were loosened to find these picks. Empty when the match is exact. */
+  dropped: string[];
   source: "gemini" | "fallback";
 }
 
@@ -28,24 +30,31 @@ export interface ChatTurn {
 export const searchRestaurantsTool = createTool({
   id: "searchRestaurants",
   description:
-    "Find restaurants. Filter by craving, max price tier (1=$, 2=$$, 3=$$$), the T line at the nearest stop, and independent-only. Returns ids, names, price, and nearest stop.",
+    "Find restaurants. Filter by craving, neighborhood, max price tier (1=$, 2=$$, 3=$$$), the T line at the nearest stop, and independent-only. If nothing matches it loosens filters automatically: `exact` is false and `dropped` lists what it loosened.",
   inputSchema: z.object({
     craving: z.enum(CRAVINGS as [string, ...string[]]).optional(),
+    neighborhood: z.enum(NEIGHBORHOOD_IDS as [string, ...string[]]).optional().describe("Use when the student names an area, e.g. chinatown"),
     maxPrice: z.number().int().min(1).max(3).optional(),
     line: z.enum(LINES as [string, ...string[]]).optional(),
     independentOnly: z.boolean().optional(),
   }),
-  execute: async (input) =>
-    searchRestaurants({ ...input, limit: 6 } as Parameters<typeof searchRestaurants>[0]).map((r) => ({
-      id: r.id,
-      name: r.name,
-      craving: r.craving,
-      price: r.price,
-      isChain: r.isChain,
-      neighborhood: r.neighborhood,
-      nearestStop: getStation(r.nearestStopId)?.name,
-      lines: getStation(r.nearestStopId)?.lines,
-    })),
+  execute: async (input) => {
+    const { results, exact, dropped } = searchWithRelaxation({ ...input, limit: 6 } as Parameters<typeof searchWithRelaxation>[0]);
+    return {
+      exact,
+      dropped,
+      results: results.map((r) => ({
+        id: r.id,
+        name: r.name,
+        craving: r.craving,
+        price: r.price,
+        isChain: r.isChain,
+        neighborhood: r.neighborhood,
+        nearestStop: getStation(r.nearestStopId)?.name,
+        lines: getStation(r.nearestStopId)?.lines,
+      })),
+    };
+  },
 });
 
 const getArrivalsTool = createTool({
@@ -80,7 +89,9 @@ function getAgent(apiKey: string): Agent {
       "Use getRoute or getArrivals when the student asks how long it takes or when the next train is.",
       "Prefer independent places when it is a tie. Budget words like cheap or broke mean maxPrice 1.",
       "The app shows restaurant cards itself, so reply in one or two short plain sentences and do not list details.",
-      "No emoji. If nothing matches, say so and suggest a looser craving or budget.",
+      "If the student names an area, pass it as neighborhood.",
+      "If searchRestaurants returns exact=false, say in one sentence which filters were loosened (the dropped list) and present the picks as the closest alternatives. Never say nothing was found when results is not empty.",
+      "If results is empty, say so and suggest a looser craving or budget. No emoji.",
     ].join("\n"),
     model: createGoogleGenerativeAI({ apiKey })(GEMINI_MODEL),
     tools: { searchRestaurants: searchRestaurantsTool, getArrivals: getArrivalsTool, getRoute: getRouteTool },
@@ -90,14 +101,13 @@ function getAgent(apiKey: string): Agent {
 // ---- Public entry point ----
 
 function fallback(prompt: string): ConciergeReply {
-  const picks = searchRestaurants({ ...parseQuery(prompt), limit: 3 });
-  return {
-    message: picks.length
+  const { results, exact, dropped } = searchWithRelaxation({ ...parseQuery(prompt), limit: 3 });
+  const message = !results.length
+    ? "Nothing matched. Try another craving, a cheaper budget, or a different line."
+    : exact
       ? "Here are a few spots near a T stop."
-      : "Nothing matched. Try another craving, a cheaper budget, or a different line.",
-    picks,
-    source: "fallback",
-  };
+      : `No exact match, so I loosened the ${dropped.join(" and ")}. Closest options:`;
+  return { message, picks: results, dropped, source: "fallback" };
 }
 
 export async function askConcierge(prompt: string, history: ChatTurn[] = []): Promise<ConciergeReply> {
@@ -123,14 +133,18 @@ export async function askConcierge(prompt: string, history: ChatTurn[] = []): Pr
     // Picks are whatever the last searchRestaurants call returned, so the model can't invent a place.
     const known = new Map(restaurants.map((r) => [r.id, r]));
     let ids: string[] = [];
+    let dropped: string[] = [];
     for (const step of out.steps ?? []) {
       for (const tr of step.toolResults ?? []) {
-        const p = (tr as { payload?: { toolName?: string; result?: unknown } }).payload;
-        if (p?.toolName === "searchRestaurants" && Array.isArray(p.result)) ids = p.result.map((r: { id: string }) => r.id);
+        const p = (tr as { payload?: { toolName?: string; result?: { results?: { id: string }[]; dropped?: string[] } } }).payload;
+        if (p?.toolName === "searchRestaurants" && Array.isArray(p.result?.results)) {
+          ids = p.result.results.map((r) => r.id);
+          dropped = p.result.dropped ?? [];
+        }
       }
     }
     const picks = ids.map((id) => known.get(id)).filter((r): r is Restaurant => Boolean(r)).slice(0, 3);
-    return { message: text, picks, source: "gemini" };
+    return { message: text, picks, dropped, source: "gemini" };
   } catch (err) {
     console.error("[concierge] Gemini/Mastra call failed, using fallback:", err instanceof Error ? err.message : err);
     return fallback(prompt);
