@@ -2,13 +2,14 @@
 //   - pgStore:  Tiger Data (Postgres + TimescaleDB), used when DATABASE_URL is set.
 //   - memStore: in-memory fallback for demo mode. Resets on server restart.
 // The check-in route only talks to getStore(), never to a backend directly.
-import { DEFAULT_ORIGIN } from "./config";
-import { getStation } from "./data";
+import neighborhoodsJson from "../../data/neighborhoods.json";
+import { DEFAULT_ORIGIN, LINE_COLORS } from "./config";
+import { getStation, lines as allLines } from "./data";
 import { getPool, withTransaction } from "./db";
 import { distanceKm } from "./geo";
-import { LINE_QUEST_STOPS, co2SavedKg, isUnlocked, pointsForCheckin } from "./scoring";
+import { LINE_QUEST_STOPS, UNLOCK_THRESHOLD, co2SavedKg, isUnlocked, pointsForCheckin } from "./scoring";
 import { buildSeedPlayers } from "./seedData";
-import type { CheckinDoc, LeaderboardRow, LineId, Restaurant, UserDoc } from "./types";
+import type { CheckinDoc, LeaderboardRow, LineId, Profile, Restaurant, UserDoc } from "./types";
 
 // ---------- Contract ----------
 
@@ -49,10 +50,74 @@ export interface GameStore {
   /** Called after commit, once Solana returns. Must never fail the request. */
   attachTxSignature(checkinId: string, txSignature: string): Promise<void>;
   attachBadgeMint(uid: string, neighborhood: string, badgeMint: string): Promise<void>;
+  /** Progress for the profile page. Works for players with no check-ins yet. */
+  getProfile(user: StoreUser): Promise<Profile>;
 }
 
 export function getStore(): GameStore {
   return getPool() ? pgStore : memStore;
+}
+
+// ---------- Profile (shared by both backends) ----------
+
+interface ProfileFacts {
+  /** Stored name/college, if the player exists. Wins over the request's identity. */
+  stored?: { displayName: string; college: string };
+  points: number;
+  co2SavedKg: number;
+  rank: number | null;
+  totalPlayers: number;
+  hoodCounts: Map<string, number>; // neighborhood -> distinct restaurants
+  unlocks: Map<string, string | undefined>; // neighborhood -> badge mint
+  quests: Map<string, { stops: number; completed: boolean }>; // line -> progress
+  visited: string[];
+}
+
+const HOOD_NAMES = new Map(
+  (neighborhoodsJson as { features: { properties: { id: string; name: string } }[] }).features.map((f) => [
+    f.properties.id,
+    f.properties.name,
+  ]),
+);
+
+function buildProfile(user: StoreUser, f: ProfileFacts): Profile {
+  const hoodIds = new Set([...HOOD_NAMES.keys(), ...f.hoodCounts.keys()]);
+  const neighborhoods = [...hoodIds]
+    .map((id) => ({
+      id,
+      name: HOOD_NAMES.get(id) ?? id,
+      visited: Math.min(f.hoodCounts.get(id) ?? 0, UNLOCK_THRESHOLD),
+      needed: UNLOCK_THRESHOLD,
+      unlocked: f.unlocks.has(id),
+      badgeMint: f.unlocks.get(id),
+    }))
+    .sort((a, b) => Number(b.unlocked) - Number(a.unlocked) || b.visited - a.visited || a.name.localeCompare(b.name));
+
+  const quests = allLines.map((l) => {
+    const q = f.quests.get(l.id);
+    return {
+      line: l.id,
+      name: l.name,
+      color: LINE_COLORS[l.id],
+      stops: Math.min(q?.stops ?? 0, LINE_QUEST_STOPS),
+      needed: LINE_QUEST_STOPS,
+      completed: q?.completed ?? false,
+    };
+  });
+
+  return {
+    uid: user.uid,
+    displayName: f.stored?.displayName ?? user.displayName,
+    college: f.stored?.college ?? user.college,
+    points: f.points,
+    co2SavedKg: f.co2SavedKg,
+    checkins: f.visited.length,
+    rank: f.rank,
+    totalPlayers: f.totalPlayers,
+    neighborhoods,
+    quests,
+    visitedRestaurantIds: [...f.visited].sort(),
+  };
 }
 
 /** Facts about a restaurant that every check-in needs: its T lines and the CO2 saved getting there. */
@@ -188,6 +253,34 @@ const memStore: GameStore = {
   async attachBadgeMint(uid, neighborhood, badgeMint) {
     mem.badges.set(`${uid}:${neighborhood}`, badgeMint);
   },
+
+  async getProfile(user) {
+    ensureMemSeeded();
+    const u = mem.users.get(user.uid);
+    const board = memLeaderboard();
+    const mine = mem.checkins.filter((c) => c.uid === user.uid && c.verified);
+
+    const perHood = new Map<string, Set<string>>();
+    for (const c of mine) perHood.set(c.neighborhood, (perHood.get(c.neighborhood) ?? new Set()).add(c.restaurantId));
+
+    const quests = new Map<string, { stops: number; completed: boolean }>();
+    for (const [key, q] of mem.quests) {
+      const [uid, line] = key.split(":");
+      if (uid === user.uid) quests.set(line, { stops: q.stopIds.size, completed: q.completed });
+    }
+
+    return buildProfile(user, {
+      stored: u && { displayName: u.displayName, college: u.college },
+      points: u?.points ?? 0,
+      co2SavedKg: u?.co2SavedKg ?? 0,
+      rank: u ? board.findIndex((r) => r.id === user.uid) + 1 : null,
+      totalPlayers: board.length,
+      hoodCounts: new Map([...perHood].map(([h, rs]) => [h, rs.size])),
+      unlocks: new Map((u?.unlocked ?? []).map((h: string) => [h, mem.badges.get(`${user.uid}:${h}`)] as const)),
+      quests,
+      visited: [...new Set(mine.map((c) => c.restaurantId))],
+    });
+  },
 };
 
 // ---------- Tiger Data backend ----------
@@ -288,5 +381,47 @@ const pgStore: GameStore = {
       neighborhood,
       badgeMint,
     ]);
+  },
+
+  async getProfile(user) {
+    const pool = getPool()!;
+    const uid = [user.uid];
+    const [me, total, hoods, unlocks, quests, visits] = await Promise.all([
+      pool.query<{ display_name: string; college: string; points: number; co2: number; rank: number }>(
+        `SELECT display_name, college, points, co2_saved_kg::float AS co2,
+                (SELECT count(*)::int + 1 FROM users o  -- same order as the citywide leaderboard
+                  WHERE o.points > u.points OR (o.points = u.points AND o.display_name < u.display_name)) AS rank
+           FROM users u WHERE uid = $1`,
+        uid,
+      ),
+      pool.query<{ n: number }>(`SELECT count(*)::int AS n FROM users`),
+      pool.query<{ neighborhood: string; n: number }>(
+        `SELECT neighborhood, count(DISTINCT restaurant_id)::int AS n
+           FROM checkins WHERE uid = $1 AND verified GROUP BY neighborhood`,
+        uid,
+      ),
+      pool.query<{ neighborhood: string; badge_mint: string | null }>(
+        `SELECT neighborhood, badge_mint FROM unlocks WHERE uid = $1`,
+        uid,
+      ),
+      pool.query<{ line: string; n: number; completed: boolean }>(
+        `SELECT line, cardinality(stop_ids)::int AS n, completed FROM quests WHERE uid = $1`,
+        uid,
+      ),
+      pool.query<{ restaurant_id: string }>(`SELECT restaurant_id FROM first_visits WHERE uid = $1`, uid),
+    ]);
+
+    const row = me.rows[0];
+    return buildProfile(user, {
+      stored: row && { displayName: row.display_name, college: row.college },
+      points: row?.points ?? 0,
+      co2SavedKg: row?.co2 ?? 0,
+      rank: row ? row.rank : null,
+      totalPlayers: total.rows[0].n,
+      hoodCounts: new Map(hoods.rows.map((r) => [r.neighborhood, r.n])),
+      unlocks: new Map(unlocks.rows.map((r) => [r.neighborhood, r.badge_mint ?? undefined])),
+      quests: new Map(quests.rows.map((r) => [r.line, { stops: r.n, completed: r.completed }])),
+      visited: visits.rows.map((r) => r.restaurant_id),
+    });
   },
 };
