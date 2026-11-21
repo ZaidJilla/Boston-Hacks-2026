@@ -2,8 +2,7 @@
 
 All game state lives in Tiger Data (Postgres + TimescaleDB): players, every check-in, first visits, neighborhood unlocks and line quests. The leaderboards are plain SQL over it. Schema: [`db/schema.sql`](../db/schema.sql).
 
-<!-- TODO(Raed): screenshot of the Tiger console Explorer showing the tables, checkins marked as a hypertable -->
-![Tiger console: tables and the checkins hypertable](img/tiger-explorer.png)
+![Tiger console: the checkins hypertable, 4 tables and the checkins_daily continuous aggregate](img/tiger-explorer.png)
 
 ## Why check-ins are a hypertable
 
@@ -58,15 +57,15 @@ SELECT u.uid AS id, u.display_name AS name, u.college, SUM(d.checkins)::int AS p
  ORDER BY points DESC, name LIMIT $2;
 ```
 
-Check-in activity over time, as charted in the Tiger console:
+Check-in activity over time, charted in the Tiger console straight from the continuous aggregate:
 
 ```sql
-SELECT day, neighborhood, SUM(checkins) AS checkins
-  FROM checkins_daily GROUP BY day, neighborhood ORDER BY day;
+SELECT day::date AS day, SUM(checkins)::int AS total_checkins
+  FROM checkins_daily
+ GROUP BY 1 ORDER BY 1;
 ```
 
-<!-- TODO(Raed): screenshot of this query + its chart in the Tiger console SQL editor -->
-![Check-ins per neighborhood per day](img/tiger-query.png)
+![Check-ins per day over the last two weeks, from checkins_daily](img/tiger-query.png)
 
 ## Seed data with real history
 
