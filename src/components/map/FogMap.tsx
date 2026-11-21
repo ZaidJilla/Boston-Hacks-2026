@@ -37,8 +37,9 @@ interface Props {
 const INK = "#14181C";
 const FOG_COLOR = "#C9CED3";
 
-// Locked: muted grey wash. Unlocked: clear, with a colored edge (T green = progress).
-const FOG: PathOptions = { fillColor: "#8A939B", fillOpacity: 0.55, color: "#7C878E", weight: 1, opacity: 0.7 };
+// Locked: muted grey wash with a dark border so neighboring areas are easy to tell apart.
+// Unlocked: clear, with a colored edge (T green = progress).
+const FOG: PathOptions = { fillColor: "#8A939B", fillOpacity: 0.55, color: "#2B3137", weight: 2, opacity: 0.9 };
 const CLEAR: PathOptions = { fillColor: LINE_COLORS.green, fillOpacity: 0.04, color: LINE_COLORS.green, weight: 3, opacity: 1 };
 
 function Flyer({ target }: { target: FlyTarget }) {
@@ -153,6 +154,16 @@ export default function FogMap({
   );
 
   const hoodStyle = (f?: NeighborhoodFeature) => (f && unlocked.has(f.properties.id) ? CLEAR : FOG);
+  // Draw unlocked neighborhoods last so their green edge sits on top of a shared fog border.
+  const orderedHoods = useMemo(
+    () => ({
+      ...neighborhoods,
+      features: [...neighborhoods.features].sort(
+        (a, b) => Number(unlocked.has(a.properties.id)) - Number(unlocked.has(b.properties.id)),
+      ),
+    }),
+    [unlocked],
+  );
 
   return (
     <MapContainer
@@ -181,7 +192,7 @@ export default function FogMap({
         <GeoJSON
           // re-key so Leaflet restyles when the unlocked set changes
           key={[...unlocked].sort().join(",")}
-          data={neighborhoods}
+          data={orderedHoods}
           interactive={false}
           style={hoodStyle as L.StyleFunction}
         />
