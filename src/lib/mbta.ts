@@ -1,9 +1,9 @@
-// Server only. MBTA V3 predictions. Never throws. A real empty response returns []; canned arrivals
-// are used only in demo mode when the live call fails.
-const failed = (): Arrival[] => (DEMO_MODE ? demoArrivals : []);
-import { DEMO_MODE } from "./config";
+// Server only. MBTA V3 predictions. Never throws. A real empty response returns []; a hard failure
+// (network error, bad status) falls back to canned arrivals, per the demo rule in CLAUDE.md.
 import { demoArrivals } from "./demo";
 import type { Arrival, LineId } from "./types";
+
+const failed = (): Arrival[] => demoArrivals;
 
 export function routeToLine(routeId: string | undefined): LineId {
   if (!routeId) return "silver";
@@ -64,15 +64,26 @@ const mbtaUrl = (path: string, params: Record<string, string>) => {
 };
 
 /** Minutes until the next vehicle on a route at a stop, or null if unknown. */
-export async function getNextDeparture(stopId: string, routeId: string): Promise<number | null> {
+export async function getNextDeparture(stopId: string, routeId: string, toStopId?: string): Promise<number | null> {
   try {
-    const res = await fetch(
-      mbtaUrl("predictions", { "filter[stop]": stopId, "filter[route]": routeId, sort: "departure_time", "page[limit]": "3" }),
-      { cache: "no-store", signal: AbortSignal.timeout(4000) },
-    );
-    if (!res.ok) return null;
+    const get = async (stop: string, limit: string) => {
+      const res = await fetch(
+        mbtaUrl("predictions", { "filter[stop]": stop, "filter[route]": routeId, sort: "departure_time", "page[limit]": limit }),
+        { cache: "no-store", signal: AbortSignal.timeout(4000) },
+      );
+      return res.ok ? (((await res.json()).data ?? []) as any[]) : null;
+    };
+    // Direction: only count trips that also call at the stop where the rider gets off.
+    const [board, alight] = await Promise.all([get(stopId, toStopId ? "10" : "3"), toStopId ? get(toStopId, "20") : null]);
+    if (!board) return null;
+    let trips: Set<string> | null = null;
+    if (toStopId) {
+      if (!alight) return null;
+      trips = new Set(alight.map((p) => p.relationships?.trip?.data?.id).filter(Boolean));
+    }
     const now = Date.now();
-    for (const p of (await res.json()).data ?? []) {
+    for (const p of board) {
+      if (trips && !trips.has(p.relationships?.trip?.data?.id)) continue;
       const t = p.attributes?.departure_time ?? p.attributes?.arrival_time;
       if (!t) continue;
       const m = Math.round((new Date(t).getTime() - now) / 60000);
