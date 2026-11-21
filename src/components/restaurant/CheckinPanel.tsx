@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import Button from "@/components/ui/Button";
 import { DEMO_MODE } from "@/lib/config";
-import { useUser } from "@/lib/auth";
+import { getClientAuth } from "@/lib/firebase";
 import type { CheckinResult } from "@/lib/types";
 
 /** Downscale a photo to ~1280 px JPEG and return base64 without the data: prefix. */
@@ -31,7 +31,6 @@ function getPosition(): Promise<{ lat: number; lng: number }> {
 const prettyHood = (id: string) => id.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
 
 export default function CheckinPanel({ restaurantId }: { restaurantId: string }) {
-  const { user } = useUser();
   const fileRef = useRef<HTMLInputElement>(null);
   const [receipt, setReceipt] = useState<File | null>(null);
   const [result, setResult] = useState<CheckinResult | null>(null);
@@ -49,13 +48,14 @@ export default function CheckinPanel({ restaurantId }: { restaurantId: string })
         const [pos, receiptBase64] = await Promise.all([getPosition(), photoToBase64(receipt)]);
         extra = { ...pos, receiptBase64 };
       }
+      const idToken = await getClientAuth()?.currentUser?.getIdToken();
       const res = await fetch("/api/checkin", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          restaurantId, simulate, ...extra,
-          uid: user?.uid, displayName: user?.displayName, college: user?.college,
-        }),
+        headers: {
+          "Content-Type": "application/json",
+          ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+        },
+        body: JSON.stringify({ restaurantId, simulate, ...extra }),
       });
       const data = (await res.json()) as CheckinResult;
       if (!data.ok) throw new Error(data.error ?? "Check-in failed.");

@@ -5,6 +5,8 @@ import { distanceKm, distanceMeters } from "@/lib/geo";
 import { verifyReceipt } from "@/lib/gemini";
 import { logCheckin, mintBadge } from "@/lib/solana";
 import { mem } from "@/lib/store";
+import { verifyIdToken } from "@/lib/authServer";
+import { collegeFromEmail } from "@/lib/colleges";
 import { CHECKIN_RADIUS_M, co2SavedKg, isUnlocked, pointsForCheckin } from "@/lib/scoring";
 import type { CheckinRequest, CheckinResult } from "@/lib/types";
 import { DEFAULT_ORIGIN } from "@/lib/config";
@@ -15,8 +17,16 @@ const fail = (error: string, status = 400) =>
 // TODO(Person 2): when getPool() is configured, do this in one Postgres transaction against Tiger Data,
 // handle line quests, and enforce auth. This version runs on the in-memory store.
 export async function POST(req: Request) {
-  const body = (await req.json()) as CheckinRequest & { uid?: string; displayName?: string; college?: string };
-  const uid = body.uid ?? "demo-user";
+  const body = (await req.json()) as CheckinRequest;
+
+  // Identity comes only from a verified Firebase ID token, never from the body.
+  const token = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ?? null;
+  const verified = await verifyIdToken(token);
+  if (!verified && !DEMO_MODE) return fail("Sign in to check in", 401);
+  const uid = verified?.uid ?? "demo-user";
+  const displayName = verified ? verified.name || "Student" : "Demo Student";
+  const college = verified ? collegeFromEmail(verified.email) : "Northeastern";
+  const email = verified?.email ?? "";
   const r = getRestaurant(body.restaurantId);
   if (!r) return fail("Restaurant not found", 404);
 
@@ -33,9 +43,7 @@ export async function POST(req: Request) {
     return fail("Already checked in here");
 
   const user = mem.users.get(uid) ?? {
-    displayName: body.displayName ?? "Demo Student",
-    email: "",
-    college: body.college ?? "Northeastern",
+    displayName, email, college,
     points: 0, unlocked: [], co2SavedKg: 0, createdAt: Date.now(),
   };
 
