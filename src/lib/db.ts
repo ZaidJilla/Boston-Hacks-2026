@@ -10,23 +10,32 @@ export function getPool(): Pool | null {
   return (g.__pool ??= new Pool({ connectionString: url, ssl: { rejectUnauthorized: false }, max: 5 }));
 }
 
+// Postgres asks the client to retry these: deadlock_detected, serialization_failure.
+const RETRYABLE = new Set(["40P01", "40001"]);
+const MAX_ATTEMPTS = 3;
+
 /**
  * Run `fn` inside BEGIN/COMMIT on one pooled client. Any throw rolls everything back,
  * so a check-in either fully lands (checkin + points + unlock + quest) or not at all.
+ * Deadlocks (e.g. two inserts creating the same new hypertable chunk) are retried.
  */
 export async function withTransaction<T>(fn: (db: PoolClient) => Promise<T>): Promise<T> {
   const pool = getPool();
   if (!pool) throw new Error("withTransaction called without DATABASE_URL");
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    const result = await fn(client);
-    await client.query("COMMIT");
-    return result;
-  } catch (err) {
-    await client.query("ROLLBACK").catch(() => {});
-    throw err;
-  } finally {
-    client.release();
+  for (let attempt = 1; ; attempt++) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const result = await fn(client);
+      await client.query("COMMIT");
+      return result;
+    } catch (err) {
+      await client.query("ROLLBACK").catch(() => {});
+      const code = (err as { code?: string }).code;
+      if (!code || !RETRYABLE.has(code) || attempt >= MAX_ATTEMPTS) throw err;
+      await new Promise((r) => setTimeout(r, 50 * attempt + Math.random() * 100));
+    } finally {
+      client.release();
+    }
   }
 }

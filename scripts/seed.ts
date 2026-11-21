@@ -32,20 +32,16 @@ async function main() {
 
     const store = getStore();
     let done = 0;
-    // Players are independent, so run a few in parallel (pool max is 5); each player's
-    // visits stay in time order so unlocks happen on the right check-in.
-    const queue = [...players];
-    await Promise.all(
-      Array.from({ length: 4 }, async () => {
-        for (let p = queue.shift(); p; p = queue.shift()) {
-          for (const { restaurant: r, at } of p.visits) {
-            await store.recordCheckin({ user: p.user, restaurant: r, lat: r.lat, lng: r.lng, createdAt: at, ...checkinFacts(r) });
-            done++;
-          }
-        }
-      }),
-    );
-    console.log(`Wrote ${done} check-ins.`);
+    // Sequential on purpose: back-dated inserts create many new daily chunks, and parallel
+    // chunk creation deadlocks. Visits stay in time order so unlocks land on the right one.
+    for (const p of players) {
+      for (const { restaurant: r, at } of p.visits) {
+        await store.recordCheckin({ user: p.user, restaurant: r, lat: r.lat, lng: r.lng, createdAt: at, ...checkinFacts(r) });
+        done++;
+      }
+      process.stdout.write(`\rWrote ${done} check-ins...`);
+    }
+    console.log(`\rWrote ${done} check-ins.   `);
 
     await pool.query(`CALL refresh_continuous_aggregate('checkins_daily', NULL, NULL)`).catch((err) => {
       console.warn("Couldn't refresh checkins_daily (run npm run db:migrate?):", err.message);
