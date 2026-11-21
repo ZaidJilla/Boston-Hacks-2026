@@ -5,7 +5,7 @@ import { distanceKm, distanceMeters } from "@/lib/geo";
 import { verifyReceipt } from "@/lib/gemini";
 import { logCheckin, mintBadge } from "@/lib/solana";
 import { mem } from "@/lib/store";
-import { verifyIdToken } from "@/lib/authServer";
+import { adminConfigured, verifyIdToken } from "@/lib/authServer";
 import { collegeFromEmail } from "@/lib/colleges";
 import { CHECKIN_RADIUS_M, co2SavedKg, isUnlocked, pointsForCheckin } from "@/lib/scoring";
 import type { CheckinRequest, CheckinResult } from "@/lib/types";
@@ -22,10 +22,12 @@ export async function POST(req: Request) {
   const body = (await req.json()) as CheckinRequest;
 
   // Identity comes only from a verified Firebase ID token, never from the body.
-  // A token that was sent but fails verification (e.g. expired) is rejected, never downgraded to demo.
+  // When the server can verify tokens, a token that is sent but fails (e.g. expired) is rejected,
+  // never downgraded to demo. When Firebase Admin isn't configured, the header is ignored.
   const authHeader = req.headers.get("authorization");
-  const verified = authHeader ? await verifyIdToken(authHeader.replace(/^Bearer\s+/i, "")) : null;
-  if (authHeader && !verified) return fail("Your session expired. Sign in again.", 401);
+  const canVerify = adminConfigured();
+  const verified = authHeader && canVerify ? await verifyIdToken(authHeader.replace(/^Bearer\s+/i, "")) : null;
+  if (authHeader && canVerify && !verified) return fail("Your session expired. Sign in again.", 401);
   if (!verified && !DEMO_MODE) return fail("Sign in to check in", 401);
   const uid = verified?.uid ?? "demo-user";
   const displayName = verified ? verified.name || "Student" : "Demo Student";
@@ -35,19 +37,19 @@ export async function POST(req: Request) {
   const r = getRestaurant(body.restaurantId);
   if (!r) return fail("Restaurant not found", 404);
 
-  // Cheap duplicate check first, and an in-flight lock so concurrent requests can't both pass it.
-  const lockKey = `${uid}:${r.id}`;
-  if (mem.checkins.some((c) => c.uid === uid && c.restaurantId === r.id) || inFlight.has(lockKey))
-    return fail("Already checked in here");
-  inFlight.add(lockKey);
+  // Cheap duplicate check first. One in-flight check-in per user, so the read-compute-write on
+  // that user's state can't interleave with another request.
+  if (mem.checkins.some((c) => c.uid === uid && c.restaurantId === r.id)) return fail("Already checked in here");
+  if (inFlight.has(uid)) return fail("Another check-in is still processing. Try again in a moment.", 409);
+  inFlight.add(uid);
   try {
-    return await process(body, r, uid, { displayName, email, college });
+    return await handleCheckin(body, r, uid, { displayName, email, college });
   } finally {
-    inFlight.delete(lockKey);
+    inFlight.delete(uid);
   }
 }
 
-async function process(
+async function handleCheckin(
   body: CheckinRequest,
   r: NonNullable<ReturnType<typeof getRestaurant>>,
   uid: string,
