@@ -123,6 +123,7 @@ The app should feel like Boston, not a generic SaaS dashboard.
 
 ```
 npm run dev              Start local dev server
+npm run data:all         Run hoods, gtfs, food in order
 npm run data:hoods       Prepare neighborhood GeoJSON
 npm run data:gtfs        Parse MBTA GTFS into stations, lines, travel times
 npm run data:food        Pull restaurants from OpenStreetMap and tag them
