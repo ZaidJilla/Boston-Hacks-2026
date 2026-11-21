@@ -52,6 +52,8 @@ export interface GameStore {
   attachBadgeMint(uid: string, neighborhood: string, badgeMint: string): Promise<void>;
   /** Progress for the profile page. Works for players with no check-ins yet. */
   getProfile(user: StoreUser): Promise<Profile>;
+  /** Cheap pre-check so duplicates don't cost a Gemini call. recordCheckin still enforces it. */
+  hasVisited(uid: string, restaurantId: string): Promise<boolean>;
 }
 
 export function getStore(): GameStore {
@@ -254,6 +256,11 @@ const memStore: GameStore = {
     mem.badges.set(`${uid}:${neighborhood}`, badgeMint);
   },
 
+  async hasVisited(uid, restaurantId) {
+    ensureMemSeeded();
+    return mem.checkins.some((c) => c.uid === uid && c.restaurantId === restaurantId);
+  },
+
   async getProfile(user) {
     ensureMemSeeded();
     const u = mem.users.get(user.uid);
@@ -381,6 +388,14 @@ const pgStore: GameStore = {
       neighborhood,
       badgeMint,
     ]);
+  },
+
+  async hasVisited(uid, restaurantId) {
+    const r = await getPool()!.query(`SELECT 1 FROM first_visits WHERE uid = $1 AND restaurant_id = $2`, [
+      uid,
+      restaurantId,
+    ]);
+    return (r.rowCount ?? 0) > 0;
   },
 
   async getProfile(user) {

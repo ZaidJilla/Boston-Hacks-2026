@@ -31,11 +31,20 @@ export async function POST(req: Request) {
   }
 
   // 1. Who
-  const user = await userFromRequest(req, { uid: body.uid, displayName: body.displayName, college: body.college });
-  if (!user) return fail("Sign in to check in", 401);
+  const auth = await userFromRequest(req, { uid: body.uid, displayName: body.displayName, college: body.college });
+  if (!auth.ok) return fail(auth.error, auth.status);
+  const user = auth.user;
 
   const r = body.restaurantId ? getRestaurant(body.restaurantId) : undefined;
   if (!r) return fail("Restaurant not found", 404);
+
+  // Cheap duplicate check before spending a Gemini call. The transaction re-checks for real.
+  const store = getStore();
+  try {
+    if (await store.hasVisited(user.uid, r.id)) return fail("You already checked in here", 409);
+  } catch (err) {
+    console.error("hasVisited failed", err); // not fatal: recordCheckin enforces it anyway
+  }
 
   if (body.simulate && !DEMO_MODE) return fail("Simulated check-ins are off", 403);
   const simulate = DEMO_MODE && body.simulate === true;
@@ -60,7 +69,6 @@ export async function POST(req: Request) {
   const { lines, co2SavedKg: co2 } = checkinFacts(r);
 
   // 4. Store
-  const store = getStore();
   let outcome;
   try {
     outcome = await store.recordCheckin({ user, restaurant: r, lines, lat, lng, co2SavedKg: co2 });

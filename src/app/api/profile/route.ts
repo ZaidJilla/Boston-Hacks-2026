@@ -9,11 +9,11 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   const uid = new URL(req.url).searchParams.get("uid") ?? undefined;
-  const user = await userFromRequest(req, { uid });
-  if (!user) return NextResponse.json({ error: "Sign in to see your profile" }, { status: 401 });
+  const auth = await userFromRequest(req, { uid });
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   try {
-    return NextResponse.json(await getStore().getProfile(user));
+    return NextResponse.json(await getStore().getProfile(auth.user));
   } catch (err) {
     console.error("getProfile failed", err);
     return NextResponse.json({ error: "Couldn't load your profile, try again" }, { status: 500 });
