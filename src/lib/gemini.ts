@@ -2,6 +2,7 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { DEMO_MODE } from "./config";
 import { demoVerdict } from "./demo";
+import { RECEIPT_GRACE_HOURS } from "./scoring";
 import type { ReceiptVerdict } from "./types";
 
 const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
@@ -12,19 +13,42 @@ export const MAX_RECEIPT_BASE64_CHARS = 5_500_000;
 const reject = (reason: string): ReceiptVerdict => ({ valid: false, nameMatches: false, datedToday: false, reason });
 const fallback = (reason: string): ReceiptVerdict => (DEMO_MODE ? demoVerdict : reject(reason));
 
+const TZ = "America/New_York";
+
 /** Today's date in Boston. toISOString() is UTC, which is "tomorrow" after 7 PM EST. */
 export function todayInBoston(now = new Date()): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York" }).format(now); // YYYY-MM-DD
+  return new Intl.DateTimeFormat("en-CA", { timeZone: TZ }).format(now); // YYYY-MM-DD
 }
 
-/** Accepts raw base64 or a data URL. Returns clean base64 + mime type. */
+/**
+ * Receipt dates we accept right now: today, plus yesterday during the first
+ * RECEIPT_GRACE_HOURS after midnight (late dinner, check in on the walk home).
+ */
+export function acceptableReceiptDates(now = new Date()): string[] {
+  const dates = [todayInBoston(now)];
+  const hour = Number(new Intl.DateTimeFormat("en-US", { timeZone: TZ, hour: "numeric", hourCycle: "h23" }).format(now));
+  if (hour < RECEIPT_GRACE_HOURS) dates.push(todayInBoston(new Date(now.getTime() - (hour + 1) * 3_600_000)));
+  return dates;
+}
+
+// First characters of base64 for each format's magic bytes.
+const SIGNATURES: [string, string][] = [
+  ["/9j/", "image/jpeg"],
+  ["iVBORw0KGgo", "image/png"],
+  ["UklGR", "image/webp"],
+];
+// Image types Gemini accepts. HEIC/HEIF (iPhone default) is fine, no client conversion needed.
+const SUPPORTED = new Set(["image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"]);
+
+/** Accepts raw base64 or a data URL. Returns clean base64 + mime type, or null if not a supported image. */
 export function parseImage(input: string): { data: string; mimeType: string } | null {
-  const m = input.match(/^data:(image\/[\w.+-]+);base64,(.*)$/s);
+  const m = input.match(/^data:([\w/.+-]+);base64,(.*)$/s);
   const data = (m ? m[2] : input).replace(/\s/g, "");
   if (!data) return null;
-  // TODO(Raed): sniff magic bytes when there's no data-URL prefix
-  // (iVBOR = png, /9j/ = jpeg, UklGR = webp). HEIC from iPhones: ask Zaid to convert client-side.
-  return { data, mimeType: m?.[1] ?? "image/jpeg" };
+  const sniffed = SIGNATURES.find(([sig]) => data.startsWith(sig))?.[1];
+  const declared = m?.[1]?.toLowerCase();
+  const mimeType = sniffed ?? (declared && SUPPORTED.has(declared) ? declared : null);
+  return mimeType ? { data, mimeType } : null;
 }
 
 // What we ask Gemini for. Richer than ReceiptVerdict so we can decide on our side.
@@ -48,16 +72,56 @@ const RECEIPT_SCHEMA = {
   required: ["isReceipt", "merchantName", "receiptDate", "legible", "reason"],
 };
 
+// Words that don't identify a restaurant. Dropped before comparing.
+const FILLER = new Set([
+  "the", "and", "of", "inc", "llc", "co", "corp", "ltd", "restaurant", "restaurants", "cafe", "bar",
+  "grill", "kitchen", "eatery", "store", "location", "boston", "cambridge", "somerville", "ma",
+]);
+
+function tokens(s: string): string[] {
+  const words = s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "") // café -> cafe
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/#\s*\d+/g, " ") // store numbers
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(" ")
+    .filter((w) => w && !/^\d+$/.test(w));
+  const core = words.filter((w) => !FILLER.has(w));
+  return core.length ? core : words; // "The Kitchen" shouldn't become empty
+}
+
 /**
- * Loose merchant match: receipts abbreviate ("SWEETGREEN #123", "Tatte Bakery & Cafe").
- * TODO(Raed): normalize (lowercase, strip punctuation/"the"/"#123"/"inc"), then accept if
- * either contains the other or token overlap is high. Test with real receipts.
+ * Loose merchant match. Receipts abbreviate, add store numbers and branch names:
+ * "SWEETGREEN #123 BOYLSTON" vs "sweetgreen", "Tatte Bakery & Cafe" vs "TATTE BAKERY".
  */
 export function namesMatch(receiptName: string, restaurantName: string): boolean {
-  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
-  const a = norm(receiptName);
-  const b = norm(restaurantName);
-  return Boolean(a && b && (a.includes(b) || b.includes(a)));
+  const a = tokens(receiptName);
+  const b = tokens(restaurantName);
+  if (!a.length || !b.length) return false;
+
+  // Ignore spacing: "SWEET GREEN" vs "Sweetgreen".
+  const ca = a.join("");
+  const cb = b.join("");
+  const shorter = Math.min(ca.length, cb.length);
+  if (shorter >= 4 && (ca.includes(cb) || cb.includes(ca))) return true;
+
+  // Most of the restaurant's identifying words appear on the receipt, allowing POS-style
+  // abbreviations: prefixes ("BAK") and dropped vowels ("BKRY").
+  const hits = b.filter((w) => a.some((x) => wordMatches(x, w)));
+  return hits.length / b.length >= 0.6;
+}
+
+function wordMatches(x: string, w: string): boolean {
+  if (x === w) return true;
+  const [short, long] = x.length <= w.length ? [x, w] : [w, x];
+  if (short.length < 3 || short[0] !== long[0]) return false;
+  if (long.startsWith(short)) return true;
+  // Letters of the short word appear in order in the long one: bkry ⊂ bakery.
+  let i = 0;
+  for (const ch of long) if (ch === short[i]) i++;
+  return i === short.length && short.length >= long.length / 2;
 }
 
 export async function verifyReceipt(
@@ -96,8 +160,7 @@ export async function verifyReceipt(
     if (!r.isReceipt) return reject(r.reason || "That doesn't look like a receipt");
     if (!r.legible) return reject("Receipt is blurry, try a clearer photo");
     const nameMatches = namesMatch(r.merchantName ?? "", restaurantName);
-    const datedToday = r.receiptDate === today;
-    // TODO(Raed): decide whether to allow yesterday's date between midnight and 4 AM.
+    const datedToday = acceptableReceiptDates().includes(r.receiptDate ?? "");
     return {
       valid: nameMatches && datedToday,
       nameMatches,
