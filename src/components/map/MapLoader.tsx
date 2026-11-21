@@ -1,9 +1,14 @@
 "use client";
 import dynamic from "next/dynamic";
 
-const MapView = dynamic(() => import("./MapView"), {
+// Leaflet touches `window`, so the whole map screen is client-only.
+const MapLoader = dynamic(() => import("./MapScreen"), {
   ssr: false,
-  loading: () => <div className="h-[calc(100vh-3.5rem)] bg-fog" />,
+  loading: () => (
+    <div className="fixed inset-x-0 bottom-14 top-0 flex items-center justify-center bg-fog text-sm text-ink/60">
+      Loading the map…
+    </div>
+  ),
 });
 
-export default MapView;
+export default MapLoader;
