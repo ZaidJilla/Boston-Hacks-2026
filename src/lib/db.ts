@@ -24,18 +24,22 @@ export async function withTransaction<T>(fn: (db: PoolClient) => Promise<T>): Pr
   if (!pool) throw new Error("withTransaction called without DATABASE_URL");
   for (let attempt = 1; ; attempt++) {
     const client = await pool.connect();
+    // If ROLLBACK itself fails, the connection is broken: destroy it instead of pooling it.
+    let broken = false;
     try {
       await client.query("BEGIN");
       const result = await fn(client);
       await client.query("COMMIT");
       return result;
     } catch (err) {
-      await client.query("ROLLBACK").catch(() => {});
+      await client.query("ROLLBACK").catch(() => {
+        broken = true;
+      });
       const code = (err as { code?: string }).code;
-      if (!code || !RETRYABLE.has(code) || attempt >= MAX_ATTEMPTS) throw err;
+      if (broken || !code || !RETRYABLE.has(code) || attempt >= MAX_ATTEMPTS) throw err;
       await new Promise((r) => setTimeout(r, 50 * attempt + Math.random() * 100));
     } finally {
-      client.release();
+      client.release(broken);
     }
   }
 }

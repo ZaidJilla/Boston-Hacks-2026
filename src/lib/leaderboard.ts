@@ -1,5 +1,6 @@
-// Server only. Leaderboards are SQL on Tiger Data, with the in-memory store as fallback
-// (demo mode, or the DB being unreachable mid-demo). Never throws.
+// Server only. Leaderboards are SQL on Tiger Data, with the in-memory store when there's no
+// database. Never throws.
+import { DEMO_MODE } from "./config";
 import { getPool } from "./db";
 import { ensureMemSeeded, mem, memLeaderboard } from "./store";
 import type { LeaderboardRow } from "./types";
@@ -9,8 +10,10 @@ async function withFallback(label: string, sql: () => Promise<LeaderboardRow[]>,
   try {
     return await sql();
   } catch (err) {
-    console.error(`leaderboard ${label} failed, using memory`, err);
-    return memory();
+    // In demo mode, keep the stage demo alive with the in-memory board. Outside demo mode,
+    // showing invented seed players as if they were real would be worse than an empty board.
+    console.error(`leaderboard ${label} failed${DEMO_MODE ? ", using memory" : ""}`, err);
+    return DEMO_MODE ? memory() : [];
   }
 }
 

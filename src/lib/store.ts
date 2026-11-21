@@ -3,7 +3,7 @@
 //   - memStore: in-memory fallback for demo mode. Resets on server restart.
 // The check-in route only talks to getStore(), never to a backend directly.
 import neighborhoodsJson from "../../data/neighborhoods.json";
-import { DEFAULT_ORIGIN, LINE_COLORS } from "./config";
+import { DEFAULT_ORIGIN, DEMO_MODE, LINE_COLORS } from "./config";
 import { getStation, lines as allLines } from "./data";
 import { getPool, withTransaction } from "./db";
 import { distanceKm } from "./geo";
@@ -137,8 +137,9 @@ interface MemQuest {
   completed: boolean;
 }
 
+// Bump the version when the shape changes, so a dev hot reload never reuses an old-shaped store.
 const g = globalThis as unknown as {
-  __store?: {
+  __storeV2?: {
     users: Map<string, UserDoc>;
     checkins: MemCheckin[];
     quests: Map<string, MemQuest>; // key: `${uid}:${line}`
@@ -147,7 +148,7 @@ const g = globalThis as unknown as {
     seeded: boolean;
   };
 };
-export const mem = (g.__store ??= {
+export const mem = (g.__storeV2 ??= {
   users: new Map(),
   checkins: [] as MemCheckin[],
   quests: new Map(),
@@ -160,6 +161,7 @@ export const mem = (g.__store ??= {
 export function ensureMemSeeded(): void {
   if (mem.seeded) return;
   mem.seeded = true;
+  if (!DEMO_MODE) return; // fake players only ever appear in demo mode
   for (const { user, visits } of buildSeedPlayers()) {
     for (const { restaurant: r, at } of visits) {
       memRecord({ user, restaurant: r, lat: r.lat, lng: r.lng, createdAt: at, ...checkinFacts(r) });
