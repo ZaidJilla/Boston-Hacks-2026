@@ -1,4 +1,7 @@
-// Server only. MBTA V3 predictions. Never throws: falls back to canned arrivals.
+// Server only. MBTA V3 predictions. Never throws. A real empty response returns []; canned arrivals
+// are used only in demo mode when the live call fails.
+const failed = (): Arrival[] => (DEMO_MODE ? demoArrivals : []);
+import { DEMO_MODE } from "./config";
 import { demoArrivals } from "./demo";
 import type { Arrival, LineId } from "./types";
 
@@ -11,19 +14,21 @@ export function routeToLine(routeId: string | undefined): LineId {
   return "silver"; // Silver Line routes are numeric ids (741, 742, ...)
 }
 
+const SILVER_LINE = new Set(["741", "742", "743", "746", "749", "751"]);
+
 export async function getArrivals(stopId: string): Promise<Arrival[]> {
   try {
     const key = process.env.MBTA_API_KEY;
     const params = new URLSearchParams({
       "filter[stop]": stopId,
-      "filter[route_type]": "0,1", // light rail and subway
+      "filter[route_type]": "0,1,3", // light rail, subway, and bus (includes Silver Line)
       sort: "arrival_time",
       "page[limit]": "8",
       include: "trip",
     });
     if (key) params.set("api_key", key);
     const res = await fetch(`https://api-v3.mbta.com/predictions?${params}`, { cache: "no-store" });
-    if (!res.ok) return demoArrivals;
+    if (!res.ok) return failed();
     const json = await res.json();
 
     const headsigns = new Map<string, string>();
@@ -36,17 +41,19 @@ export async function getArrivals(stopId: string): Promise<Arrival[]> {
     for (const p of json.data ?? []) {
       const t = p.attributes?.arrival_time ?? p.attributes?.departure_time;
       if (!t) continue;
+      const routeId: string | undefined = p.relationships?.route?.data?.id;
+      if (routeId && /^\d/.test(routeId) && !SILVER_LINE.has(routeId)) continue; // skip regular buses
       const minutes = Math.round((new Date(t).getTime() - now) / 60000);
       if (minutes < 0) continue;
       out.push({
-        line: routeToLine(p.relationships?.route?.data?.id),
+        line: routeToLine(routeId),
         headsign: headsigns.get(p.relationships?.trip?.data?.id) ?? "",
         minutes,
       });
     }
-    return out.length ? out.slice(0, 6) : demoArrivals;
+    return out.slice(0, 6);
   } catch {
-    return demoArrivals;
+    return failed();
   }
 }
 
