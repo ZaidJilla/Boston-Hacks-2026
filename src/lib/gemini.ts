@@ -9,7 +9,6 @@ const TIMEOUT_MS = 15_000;
 export const MAX_RECEIPT_BASE64_CHARS = 5_500_000;
 
 const reject = (reason: string): ReceiptVerdict => ({ valid: false, nameMatches: false, datedToday: false, reason });
-const fallback = (reason: string): ReceiptVerdict => (DEMO_MODE ? demoVerdict : reject(reason));
 
 const TZ = "America/New_York";
 
@@ -70,45 +69,60 @@ const RECEIPT_SCHEMA = {
   required: ["isReceipt", "merchantName", "receiptDate", "legible", "reason"],
 };
 
-// Words that don't identify a restaurant. Dropped before comparing.
-const FILLER = new Set([
-  "the", "and", "of", "inc", "llc", "co", "corp", "ltd", "restaurant", "restaurants", "cafe", "bar",
-  "grill", "kitchen", "eatery", "store", "location", "boston", "cambridge", "somerville", "ma",
+// Grammar and company suffixes: never part of a name's identity.
+const STOP = new Set(["the", "and", "of", "inc", "llc", "co", "corp", "ltd", "company"]);
+// Places and venue words: on receipts as branch names, so they don't identify a restaurant.
+const PLACE = new Set([
+  "boston", "cambridge", "somerville", "brookline", "allston", "brighton", "ma", "store", "location",
+  "restaurant", "restaurants", "eatery",
+]);
+// Food and venue categories shared by many restaurants. "Pizza" alone must not match every pizza place.
+const GENERIC = new Set([
+  "pizza", "pizzeria", "ramen", "sushi", "burger", "burgers", "taco", "tacos", "taqueria", "cafe", "coffee",
+  "bakery", "deli", "grill", "kitchen", "house", "bar", "pub", "tavern", "bistro", "diner", "express",
+  "noodle", "noodles", "pho", "thai", "chinese", "indian", "dumpling", "dumplings", "bbq", "tea", "juice",
+  "bagel", "bagels", "donut", "donuts", "wings", "chicken", "sandwich", "sandwiches", "salad", "seafood",
+  "oyster", "steak", "steakhouse", "market", "shop", "pastry", "creamery", "ice", "cream",
 ]);
 
-function tokens(s: string): string[] {
-  const words = s
+/** Normalized words: no accents/punctuation/store numbers/grammar words. */
+function words(s: string): string[] {
+  return s
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "") // café -> cafe
     .toLowerCase()
-    .replace(/&/g, " and ")
     .replace(/#\s*\d+/g, " ") // store numbers
     .replace(/[^a-z0-9]+/g, " ")
     .split(" ")
-    .filter((w) => w && !/^\d+$/.test(w));
-  const core = words.filter((w) => !FILLER.has(w));
-  return core.length ? core : words; // "The Kitchen" shouldn't become empty
+    .filter((w) => w.length > 1 && !/^\d+$/.test(w) && !STOP.has(w));
 }
 
 /**
- * Loose merchant match. Receipts abbreviate, add store numbers and branch names:
- * "SWEETGREEN #123 BOYLSTON" vs "sweetgreen", "Tatte Bakery & Cafe" vs "TATTE BAKERY".
+ * Merchant match. Receipts abbreviate and add store numbers and branch names
+ * ("SWEETGREEN #123 BOYLSTON", "TATTE BKRY"), but a different business must not pass.
+ * - If the restaurant has distinctive words ("tatte", "sweetgreen"), most of them must appear.
+ * - If its name is only generic/place words ("Boston Pizza"), every word must appear, so
+ *   "Pizza Hut" doesn't count as "Boston Pizza".
  */
 export function namesMatch(receiptName: string, restaurantName: string): boolean {
-  const a = tokens(receiptName);
-  const b = tokens(restaurantName);
-  if (!a.length || !b.length) return false;
+  const receipt = words(receiptName);
+  const name = words(restaurantName);
+  if (!receipt.length || !name.length) return false;
 
-  // Ignore spacing: "SWEET GREEN" vs "Sweetgreen".
-  const ca = a.join("");
-  const cb = b.join("");
-  const shorter = Math.min(ca.length, cb.length);
-  if (shorter >= 4 && (ca.includes(cb) || cb.includes(ca))) return true;
+  const receiptCompact = receipt.join("");
+  // A word "appears" if it matches a receipt word (allowing POS abbreviations), or the receipt
+  // spells it across a space: "SWEET GREEN" contains "sweetgreen".
+  const appears = (w: string) =>
+    receipt.some((x) => wordMatches(x, w)) || (w.length >= 4 && receiptCompact.includes(w));
 
-  // Most of the restaurant's identifying words appear on the receipt, allowing POS-style
-  // abbreviations: prefixes ("BAK") and dropped vowels ("BKRY").
-  const hits = b.filter((w) => a.some((x) => wordMatches(x, w)));
-  return hits.length / b.length >= 0.6;
+  const isDistinctive = (w: string) => !GENERIC.has(w) && !PLACE.has(w);
+  const distinctive = name.filter(isDistinctive);
+  if (distinctive.length) return distinctive.filter(appears).length / distinctive.length >= 0.6;
+
+  // Generic-only name ("Boston Pizza", "Pizza"): every word must appear, and the receipt can't
+  // name a different business ("Joe's Pizza", "Pizza Hut" carry distinctive words of their own).
+  const extra = receipt.filter((w) => isDistinctive(w) && !name.some((n) => wordMatches(w, n)));
+  return name.every(appears) && extra.length === 0;
 }
 
 function wordMatches(x: string, w: string): boolean {
@@ -143,23 +157,23 @@ export async function verifyReceipt(
   const key = process.env.GEMINI_API_KEY;
   if (!imageBase64) return DEMO_MODE && !key ? demoVerdict : reject("Add a photo of your receipt");
   if (imageBase64.length > MAX_RECEIPT_BASE64_CHARS) return reject("Photo is too large, try again");
-  if (!key) return fallback("Receipt check is unavailable right now");
+  // No key: the no-keys demo passes; anything else can't verify, so it fails closed.
+  if (!key) return DEMO_MODE ? demoVerdict : reject("Receipt check is unavailable right now");
 
   const image = parseImage(imageBase64);
   if (!image) return reject("Couldn't read that photo");
 
   try {
     const ai = new GoogleGenAI({ apiKey: key, httpOptions: { timeout: TIMEOUT_MS } });
-    const today = todayInBoston();
     const res = await withRetry(() => ai.models.generateContent({
       model: GEMINI_MODEL,
       contents: [
         { inlineData: image },
         {
-          // The expected restaurant is deliberately NOT in the prompt: told what to look for, the
-          // model "reads" it off blurry photos. It transcribes; our code compares.
+          // Neither the expected restaurant NOR today's date is in the prompt: told what to look
+          // for, the model "reads" it off blurry or old receipts. It transcribes; our code compares.
           text:
-            `Transcribe this photo for a receipt checker. Today is ${today} in Boston.\n` +
+            `Transcribe this photo for a receipt checker.\n` +
             `- isReceipt: is it a printed or digital purchase receipt?\n` +
             `- legible: can you clearly read the merchant name AND the date? false if blurry, cut off or too dark.\n` +
             `- merchantName: the business name exactly as printed, "" if not clearly readable.\n` +
@@ -187,7 +201,9 @@ export async function verifyReceipt(
           : "Receipt verified",
     };
   } catch (err) {
+    // Fail closed, even in demo mode: a Gemini outage must not turn any photo into a verified
+    // check-in. (Simulated check-ins never reach here.)
     console.error("verifyReceipt failed", err);
-    return fallback("Couldn't verify the receipt, try again");
+    return reject("Couldn't verify the receipt, try again");
   }
 }
