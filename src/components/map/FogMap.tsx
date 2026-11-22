@@ -161,15 +161,19 @@ function HoodLabels({ unlocked }: { unlocked: Set<string> }) {
   if (zoom < 12) return null;
   return (
     <>
-      {neighborhoods.features.map((f) => (
-        <Marker
-          key={f.properties.id}
-          position={f.properties.center}
-          icon={icons.get(f.properties.id)!}
-          interactive={false}
-          keyboard={false}
-        />
-      ))}
+      {neighborhoods.features
+        // Tiny neighborhoods (Leather District, Bay Village, Chinatown...) pile their names on top of
+        // each other when zoomed out, so they get a label once there is room. Unlocked ones always do.
+        .filter((f) => zoom >= 14 || unlocked.has(f.properties.id) || (f.properties.sqmiles ?? 1) >= 0.6)
+        .map((f) => (
+          <Marker
+            key={f.properties.id}
+            position={f.properties.center}
+            icon={icons.get(f.properties.id)!}
+            interactive={false}
+            keyboard={false}
+          />
+        ))}
     </>
   );
 }

@@ -119,17 +119,17 @@ export default function MapScreen() {
     () => (focused && layers.has("food") ? filterRestaurants(restaurants, filters) : []),
     [focused, filters, layers],
   );
-  // Famous landmarks stay on the map everywhere, even while one neighborhood is open: seeing them
-  // is what pulls people toward somewhere new.
+  // A dozen iconic landmarks stay on the map everywhere, even while one neighborhood is open: seeing
+  // them is what pulls people toward somewhere new. Everything else shows once a neighborhood opens.
   const visiblePlaces = useMemo(() => {
     const all = mapPlaces.filter((p) => p.type !== "store");
-    const famous = all.filter((p) => p.famous);
-    if (!focused) return famous;
+    const iconic = all.filter((p) => p.iconic);
+    if (!focused) return iconic;
     const rest = filterPlaces(
-      all.filter((p) => !p.famous && layers.has(p.type === "landmark" ? "landmark" : "shopping")),
+      all.filter((p) => !p.iconic && layers.has(p.type === "landmark" ? "landmark" : "shopping")),
       filters,
     );
-    return [...famous, ...rest];
+    return [...iconic, ...rest];
   }, [focused, filters, layers]);
 
   const toggleLayer = useCallback((id: MapLayer) => {

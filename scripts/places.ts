@@ -62,6 +62,16 @@ const FAMOUS_NAMES = new Set([
 ]);
 
 /**
+ * The handful shown on the map before a neighborhood is opened: one or two per area, spread out so
+ * the first view stays clean. Everything else famous appears once you open its neighborhood.
+ */
+const ICONIC_NAMES = new Set([
+  "Fenway Park", "Museum of Fine Arts", "Isabella Stewart Gardner Museum", "Boston Common", "Faneuil Hall",
+  "TD Garden", "Old North Church", "USS Constitution Museum", "Museum of Science", "Castle Island",
+  "Franklin Park Zoo", "Arnold Arboretum",
+]);
+
+/**
  * Famous places OSM doesn't carry as a tagged tourist spot. Checked against OpenStreetMap (Nominatim) and
  * Wikidata; most are within 100 m. Not found anywhere, so approximate: Edgar Allan Poe Square, Chinatown Park.
  */
@@ -288,6 +298,7 @@ async function main() {
           walkMin: Math.max(1, Math.round((distanceM * 1.3) / 80)),
         },
         famous,
+        iconic: ICONIC_NAMES.has(t.name),
         curated: isCurated,
         osm: isCurated ? null : `${el.type}/${el.id}`,
         _q: quality(t) + (c.type === "shopping" ? 10 : 0) + (famous ? 100 : 0),
@@ -328,6 +339,7 @@ async function main() {
     .map((f) => [String(f.properties!.id), places.filter((p) => p.famous && p.neighborhood === f.properties!.id).length] as const)
     .filter(([, n]) => n < 3);
   console.log(thin.length ? `  ⚠ fewer than 3 major landmarks: ${thin.map(([id, n]) => `${id}:${n}`).join(", ")}` : "  every neighborhood has at least 3 major landmarks");
+  console.log(`  iconic (shown before opening a neighborhood): ${places.filter((p) => p.iconic).map((p) => p.name).join(", ")}`);
   console.log(`  famous: ${places.filter((p) => p.famous).map((p) => `${p.name} (${p.neighborhood})`).join("; ")}`);
   console.log(`  landmark subtypes: ${tally("landmark")}`);
   console.log(`  shopping:          ${places.filter((p) => p.type === "shopping").map((p) => `${p.name} (${p.neighborhood}, ${p.nearestStation.name})`).join("; ")}`);

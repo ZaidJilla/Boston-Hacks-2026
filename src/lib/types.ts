@@ -39,6 +39,8 @@ export interface PlaceRow {
   isChain: boolean;
   /** Shown on the map by default to draw people in. */
   famous?: boolean;
+  /** One of the few shown on the map before a neighborhood is opened. */
+  iconic?: boolean;
   /** Added by hand because OSM has no tagged entry for it. */
   curated?: boolean;
   address: string | null;
