@@ -8,6 +8,7 @@ import { DEMO_MODE } from "@/lib/config";
 import { getClientAuth } from "@/lib/firebase";
 import { CHECKIN_RADIUS_M, describeBreakdown } from "@/lib/scoring";
 import type { CheckinResult } from "@/lib/types";
+import NewBadges from "@/components/badges/NewBadges";
 import UnlockScreen from "./UnlockScreen";
 
 /** Downscale a photo to ~1280 px JPEG and return base64 without the data: prefix. */
@@ -119,6 +120,11 @@ export default function CheckinPanel({
               <span className="shrink-0 text-[20px] font-black text-signal">+{result.pointsEarned}</span>
             </div>
             {result.breakdown && <p className="mt-1 text-[13px] leading-snug text-white/80">{describeBreakdown(result.breakdown)}</p>}
+            {!!result.newBadges?.length && (
+              <div className="mt-2.5">
+                <NewBadges badges={result.newBadges} tone="dark" />
+              </div>
+            )}
           </div>
         )}
         {result?.unlockedNeighborhood && !showUnlock && (
@@ -130,6 +136,7 @@ export default function CheckinPanel({
             Neighborhood unlocked · +{result.pointsEarned} points
           </button>
         )}
+        {result?.unlockedNeighborhood && !!result.newBadges?.length && <NewBadges badges={result.newBadges} />}
         {!error && !result && (
           <p className="text-[14px] text-muted">
             Be within {CHECKIN_RADIUS_M} m, or scan a receipt from today. One is enough.

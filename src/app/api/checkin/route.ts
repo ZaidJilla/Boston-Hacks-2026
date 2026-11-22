@@ -7,6 +7,8 @@ import { DEMO_MODE } from "@/lib/config";
 import { getRestaurant } from "@/lib/data";
 import { distanceMeters } from "@/lib/geo";
 import { verifyReceipt } from "@/lib/gemini";
+import { badgeCard, factsFrom, newBadges } from "@/lib/badges";
+import { getHome } from "@/lib/home";
 import { distanceFromHome } from "@/lib/economy";
 import { CHECKIN_RADIUS_M } from "@/lib/scoring";
 import { checkinFacts, getStore } from "@/lib/store";
@@ -78,10 +80,20 @@ export async function POST(req: Request) {
 
   const { lines, co2SavedKg: co2 } = checkinFacts(r);
 
-  // 3. Store
+  // 3. Store. The badge shelf is worked out from progress, so compare it before and after.
+  const homeStation = getHome(user.uid).stationId;
   let outcome;
+  let earned: ReturnType<typeof badgeCard>[] = [];
   try {
+    const before = factsFrom(await store.getProfile(user), homeStation);
     outcome = await store.recordCheckin({ user, restaurant: r, lines, lat, lng, co2SavedKg: co2, distance: distanceFromHome(user.uid, r) });
+    if (outcome.ok) {
+      try {
+        earned = newBadges(before, factsFrom(await store.getProfile(user), homeStation)).map(badgeCard);
+      } catch (err) {
+        console.error("badge check failed", err); // the check-in is saved; just no badge announcement
+      }
+    }
   } catch (err) {
     console.error("recordCheckin failed", err);
     return fail("Couldn't save your check-in, try again", 500);
@@ -96,6 +108,7 @@ export async function POST(req: Request) {
     totalPoints: outcome.totalPoints,
     unlockedNeighborhood: outcome.unlockedNeighborhood,
     questCompleted: outcome.questCompleted,
+    newBadges: earned,
     co2SavedKg: co2,
   } satisfies CheckinResult);
 }

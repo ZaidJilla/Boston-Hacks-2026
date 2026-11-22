@@ -5,12 +5,14 @@ import { useEffect, useState } from "react";
 import LineBullet from "@/components/signage/LineBullet";
 import PageHeader from "@/components/signage/PageHeader";
 import RankBadge from "@/components/rank/RankBadge";
+import BadgeShelf from "@/components/badges/BadgeShelf";
 import RankLine from "@/components/rank/RankLine";
 import StationDots from "@/components/signage/StationDots";
 import { PersonIcon } from "@/components/signage/Icons";
 import Button, { buttonClass } from "@/components/ui/Button";
 import { useUser } from "@/lib/auth";
 import { LINE_COLORS } from "@/lib/config";
+import { factsFrom } from "@/lib/badges";
 import { rankProgress } from "@/lib/scoring";
 import { stations } from "@/lib/data";
 import type { HomeResult, Profile } from "@/lib/types";
@@ -154,6 +156,8 @@ export default function ProfilePage() {
               <Stat label="Check-ins" value={String(profile.checkins)} />
               <Stat label="kg CO₂ saved" value={String(Math.round(profile.co2SavedKg * 10) / 10)} />
             </ul>
+
+            <BadgeShelf facts={factsFrom(profile, home?.stationId ?? null)} />
 
             <section aria-labelledby="explored-h" className="space-y-3">
               <div className="flex items-end justify-between gap-3">

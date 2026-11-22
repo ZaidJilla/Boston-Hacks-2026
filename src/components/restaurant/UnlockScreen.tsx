@@ -1,6 +1,7 @@
 "use client";
 // Full-screen success state after a check-in that unlocks a neighborhood.
 import Link from "next/link";
+import NewBadges from "@/components/badges/NewBadges";
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { buttonClass } from "@/components/ui/Button";
 import LineStripe from "@/components/signage/LineStripe";
@@ -178,6 +179,12 @@ export default function UnlockScreen({
             <span className="sr-only">+{result.pointsEarned} points</span>
           </span>
         </div>
+
+        {!!result.newBadges?.length && (
+          <div className="unlock-rise" style={delay(1.65)}>
+            <NewBadges badges={result.newBadges} baseDelay={1.8} />
+          </div>
+        )}
 
         <div className="unlock-rise space-y-2.5 pt-2" style={delay(1.7)}>
           <Link href="/" className={`${buttonClass("dark")} w-full`}>

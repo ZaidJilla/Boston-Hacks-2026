@@ -120,6 +120,8 @@ export interface CheckinResult {
   totalPoints: number;
   unlockedNeighborhood?: string;
   questCompleted?: LineId;
+  /** Badges this check-in earned for the first time. */
+  newBadges?: { id: string; name: string; emoji: string; color: string }[];
   co2SavedKg: number;
 }
 

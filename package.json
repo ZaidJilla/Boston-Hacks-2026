@@ -19,7 +19,8 @@
     "data:photos": "tsx scripts/photos.ts",
     "test:trip": "tsx scripts/test-trip.ts",
     "test:scoring": "tsx scripts/test-scoring.ts",
-    "test:economy": "tsx scripts/test-economy.ts"
+    "test:economy": "tsx scripts/test-economy.ts",
+    "test:badges": "tsx scripts/test-badges.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.124",
