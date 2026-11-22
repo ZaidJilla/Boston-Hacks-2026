@@ -15,7 +15,8 @@
     "data:seed": "tsx scripts/seed.ts",
     "db:migrate": "tsx scripts/migrate.ts",
     "data:all": "npm run data:hoods && npm run data:gtfs && npm run data:food && npm run data:places",
-    "data:graph": "tsx scripts/graph.ts"
+    "data:graph": "tsx scripts/graph.ts",
+    "test:trip": "tsx scripts/test-trip.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.124",
