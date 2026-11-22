@@ -96,23 +96,26 @@ export function buildSeedPlayers(now = Date.now()): SeedPlayer[] {
 }
 
 /**
- * The demo player has two neighborhoods open and a third at 2 of 3, so the profile shows an overall rank
- * AND neighborhood ranks, and ONE simulated check-in on stage still triggers the unlock celebration.
- * The neighborhoods are the ones with the most independent restaurants (they pay the most).
+ * The demo player is the Mayor of Allston (6 spots there, no seed player has more than 3), has a second
+ * neighborhood open, and a third at 2 of 3, so the profile shows an overall rank AND neighborhood ranks,
+ * and ONE simulated check-in on stage still triggers the unlock celebration.
  */
+export const DEMO_HOME_TURF = "allston";
+
 function demoVisits(now: number): SeedVisit[] {
   const byHood = new Map<string, Restaurant[]>();
   for (const r of restaurants) byHood.set(r.neighborhood, [...(byHood.get(r.neighborhood) ?? []), r]);
-  const best = [...byHood.values()]
-    .filter((rs) => rs.length >= 3)
-    .sort((a, b) => b.filter((r) => !r.isChain).length - a.filter((r) => !r.isChain).length)
-    .slice(0, 3);
   const independentsFirst = (rs: Restaurant[]) => [...rs].sort((a, b) => Number(a.isChain) - Number(b.isChain));
+  const others = [...byHood.entries()]
+    .filter(([id, rs]) => id !== DEMO_HOME_TURF && rs.length >= 3)
+    .sort((a, b) => b[1].filter((r) => !r.isChain).length - a[1].filter((r) => !r.isChain).length)
+    .slice(0, 2)
+    .map(([, rs]) => independentsFirst(rs));
   const picks: Restaurant[] = [
-    ...independentsFirst(best[0] ?? []).slice(0, 3),
-    ...independentsFirst(best[1] ?? []).slice(0, 3),
-    ...independentsFirst(best[2] ?? []).slice(0, 2),
+    ...independentsFirst(byHood.get(DEMO_HOME_TURF) ?? []).slice(0, 6),
+    ...(others[0] ?? []).slice(0, 3),
+    ...(others[1] ?? []).slice(0, 2),
   ];
   const day = 86_400_000;
-  return picks.map((restaurant, i) => ({ restaurant, at: new Date(now - (picks.length - i) * day * 0.7) }));
+  return picks.map((restaurant, i) => ({ restaurant, at: new Date(now - (picks.length - i) * day * 0.5) }));
 }

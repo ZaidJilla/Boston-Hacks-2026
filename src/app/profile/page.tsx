@@ -178,9 +178,9 @@ export default function ProfilePage() {
                     <div className="mb-2 flex items-center justify-between gap-3">
                       <span className="flex min-w-0 items-center gap-2">
                         <span className="truncate text-[16px] font-extrabold">{n.name}</span>
-                        {hoodRankFor(n.visited) && (
+                        {hoodRankFor(n.spots) && (
                           <span className="shrink-0 rounded-full bg-panel px-2 py-0.5 text-[11px] font-black uppercase tracking-[0.4px]">
-                            {hoodRankFor(n.visited)?.name}
+                            {hoodRankFor(n.spots)?.name}
                           </span>
                         )}
                       </span>

@@ -90,6 +90,7 @@ function buildProfile(user: StoreUser, f: ProfileFacts): Profile {
       id,
       name: HOOD_NAMES.get(id) ?? id,
       visited: Math.min(f.hoodCounts.get(id) ?? 0, UNLOCK_THRESHOLD),
+      spots: f.hoodCounts.get(id) ?? 0,
       needed: UNLOCK_THRESHOLD,
       unlocked: f.unlocks.has(id),
     }))

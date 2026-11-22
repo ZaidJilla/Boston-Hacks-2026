@@ -79,7 +79,7 @@ export function usePointsContext(): PointsContext | null {
           homeHood: home?.neighborhood ?? null,
           visitedHoods: new Set(profile.neighborhoods.filter((n) => n.visited > 0 || n.unlocked).map((n) => n.id)),
           visitedLines: new Set(profile.quests.filter((q) => q.stops > 0).map((q) => q.line)),
-          hoodSpots: new Map(profile.neighborhoods.map((n) => [n.id, n.unlocked ? Math.max(n.visited, 3) : n.visited])),
+          hoodSpots: new Map(profile.neighborhoods.map((n) => [n.id, n.spots])),
         });
       } catch {
         /* no preview: nothing else depends on it */
