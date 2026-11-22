@@ -3,7 +3,8 @@
 // /api/directions, drawn as a strip, with the CO2 saved versus a rideshare.
 import { useState } from "react";
 import Button from "@/components/ui/Button";
-import RouteStrip, { RouteSteps } from "@/components/signage/RouteStrip";
+import RouteStrip from "@/components/signage/RouteStrip";
+import RouteSteps from "@/components/signage/RouteSteps";
 import { co2SavedKg } from "@/lib/scoring";
 import type { RouteResult } from "@/lib/types";
 
