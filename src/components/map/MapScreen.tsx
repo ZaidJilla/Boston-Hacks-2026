@@ -34,6 +34,7 @@ import { reasonText } from "@/components/restaurant/PointsChip";
 import { useUnlocked } from "./useUnlocked";
 import { previewFor, usePointsContext } from "./usePointsPreview";
 import { useRankUp } from "./useRankUp";
+import HoodBoard from "./HoodBoard";
 import RankStrip from "@/components/rank/RankStrip";
 import RankUpScreen from "@/components/rank/RankUpScreen";
 import { rankProgress } from "@/lib/scoring";
@@ -252,6 +253,8 @@ export default function MapScreen() {
 
   const pickHood = pick ? neighborhoodById.get(pick.neighborhood) : null;
   const eaten = pick ? restaurantsIn(pick.neighborhood).filter((r) => checkins.has(r.id)).length : 0;
+  const locHoodId = filters.location.kind === "neighborhood" ? filters.location.id : null;
+  const focusedHood = locHoodId ? { id: locHoodId, name: neighborhoodById.get(locHoodId)?.properties.name ?? locHoodId } : null;
   const tappedHoodName = hoodInfo ? neighborhoodById.get(hoodInfo)?.properties.name : null;
 
   const lineFilter = filters.lines.length ? LINE_ORDER.filter((l) => filters.lines.includes(l)) : LINE_ORDER.slice(0, 4);
@@ -366,7 +369,8 @@ export default function MapScreen() {
             {locateError}
           </p>
         )}
-        <div className="pointer-events-auto w-full">
+        <div className="pointer-events-auto w-full space-y-3">
+          {focusedHood && !selectedPlace && <HoodBoard hoodId={focusedHood.id} hoodName={focusedHood.name} />}
           {selectedPlace ? (
             <PlaceCard
               p={selectedPlace}
