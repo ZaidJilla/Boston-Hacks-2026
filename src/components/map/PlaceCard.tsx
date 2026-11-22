@@ -1,48 +1,50 @@
 "use client";
 // Bottom card for a landmark or shopping place picked on the map.
-import Arrivals from "@/components/transit/Arrivals";
+import AddToTrip from "@/components/plan/AddToTrip";
+import ArrivalBoard from "@/components/signage/ArrivalBoard";
+import { LINE_ORDER } from "@/components/signage/LineBullet";
+import LineBullet from "@/components/signage/LineBullet";
+import { CloseIcon } from "@/components/signage/Icons";
 import type { MapPlace } from "@/lib/geo";
-import { LineDots } from "./RestaurantCard";
 
 const TYPE_LABEL: Record<MapPlace["type"], string> = { landmark: "Landmark", shopping: "Shopping", store: "Store" };
 
 export default function PlaceCard({ p, unlocked, onClose }: { p: MapPlace; unlocked: boolean; onClose: () => void }) {
   const st = p.nearestStation;
   const what = p.subtype.replace(/^historic-/, "").replace(/_/g, " ");
+  const line = LINE_ORDER.find((l) => st.lines.includes(l));
   return (
-    <div className="fixed inset-x-3 bottom-[164px] z-[1001] mx-auto max-w-md">
-      <div className="relative rounded-2xl bg-white p-4 shadow-xl ring-1 ring-black/10">
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close"
-          className="absolute right-2 top-2 flex h-11 w-11 items-center justify-center rounded-full text-ink/50 active:bg-black/5"
-        >
-          ✕
+    <div className="overflow-hidden rounded-card bg-white shadow-card">
+      <div className="flex items-center justify-between gap-3 bg-ink px-4 py-2.5 text-white">
+        <span className="eyebrow min-w-0 truncate text-[13px]">
+          {p.neighborhoodName} · {unlocked ? "Unlocked" : "In fog"}
+        </span>
+        <button type="button" onClick={onClose} aria-label="Close" className="hit-44 shrink-0 text-white">
+          <CloseIcon size={20} />
         </button>
-        <p className="pr-10 text-xs font-medium text-ink/60">
-          {p.neighborhoodName} · {unlocked ? "unlocked" : "foggy"}
-        </p>
-        <h2 className="mt-0.5 pr-10 text-lg font-bold leading-tight text-ink">{p.name}</h2>
-        <p className="mt-1 text-sm capitalize text-ink/70">
-          {TYPE_LABEL[p.type]} · {what}
-        </p>
-        <p className="mt-2 flex items-center gap-1.5 text-sm text-ink/70">
-          <LineDots lines={st.lines} />
-          <span>
-            {st.name} · {st.walkMin} min walk
-          </span>
-        </p>
-        <div className="mt-2">
-          <Arrivals stopId={st.id} limit={2} />
+      </div>
+      <div className="max-h-[52vh] space-y-3 overflow-y-auto px-4 pb-4 pt-3.5">
+        <div className="flex items-center gap-3">
+          {line && <LineBullet line={line} size={36} />}
+          <div className="min-w-0 flex-1">
+            <p className="text-[18px] font-black leading-tight tracking-[-0.5px]">{p.name}</p>
+            <p className="text-[14px] capitalize leading-snug text-muted">
+              {TYPE_LABEL[p.type]} · {what}
+            </p>
+            <p className="text-[14px] leading-snug text-muted">
+              {st.name}, {st.walkMin} min walk
+            </p>
+          </div>
         </div>
-        {p.openingHours && <p className="mt-2 text-xs text-ink/60">Hours: {p.openingHours}</p>}
+        <ArrivalBoard stopId={st.id} stationName={st.name} limit={2} />
+        {p.openingHours && <p className="text-[13px] text-muted">Hours: {p.openingHours}</p>}
+        <AddToTrip itemKey={`p:${p.id}`} name={p.name} />
         {p.website && (
           <a
             href={p.website}
             target="_blank"
             rel="noreferrer"
-            className="mt-3 flex min-h-[44px] items-center justify-center rounded-xl bg-ink text-sm font-semibold text-white"
+            className="hit-44 inline-block text-[14px] font-bold text-line-blue underline underline-offset-2"
           >
             Open website
           </a>

@@ -72,12 +72,6 @@ export interface UserDoc {
   unlocked: string[];
   co2SavedKg: number;
   createdAt: number;
-  /** Neighborhood.id the user calls home. Set during onboarding. */
-  homeNeighborhood?: string;
-  /** Nearest subway Station.id to that neighborhood's center. Scoring measures stops from here. */
-  homeStationId?: string;
-  /** Season label of the last home change (see seasonOf in scoring.ts). First set doesn't count. */
-  homeChangedSeason?: string;
 }
 
 export interface CheckinDoc {
@@ -171,4 +165,36 @@ export interface HomeState {
 export interface HomeResult extends HomeState {
   ok: boolean;
   error?: string;
+}
+
+// GET /api/profile
+export interface NeighborhoodProgress {
+  id: string;
+  name: string;
+  visited: number; // distinct restaurants checked into
+  needed: number; // UNLOCK_THRESHOLD
+  unlocked: boolean;
+}
+
+export interface QuestProgress {
+  line: LineId;
+  name: string; // "Orange Line"
+  color: string;
+  stops: number; // distinct stops checked in near
+  needed: number; // LINE_QUEST_STOPS
+  completed: boolean;
+}
+
+export interface Profile {
+  uid: string;
+  displayName: string;
+  college: string;
+  points: number;
+  co2SavedKg: number;
+  checkins: number;
+  rank: number | null; // citywide, null before the first check-in
+  totalPlayers: number;
+  neighborhoods: NeighborhoodProgress[]; // every neighborhood, most progress first
+  quests: QuestProgress[]; // every line
+  visitedRestaurantIds: string[]; // e.g. to mark visited pins on the map
 }

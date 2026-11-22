@@ -1,7 +1,7 @@
 "use client";
 // The answer: a clock time for every stop, and the trains between them.
 import { useState } from "react";
-import LineChip from "@/components/transit/LineChip";
+import LineBullet from "@/components/signage/LineBullet";
 import { fmtClock } from "@/lib/clock";
 import type { TripLeg, TripResult, TripStopResult, TripWarning } from "@/lib/tripTypes";
 
@@ -32,7 +32,7 @@ export default function TripTimeline({ trip }: { trip: TripResult }) {
   const stopCount = trip.stops.length - 2;
   return (
     <section aria-label="Your trip" className="space-y-3">
-      <div className="rounded-xl bg-ink p-4 text-white">
+      <div className="surface-dark rounded-card bg-ink p-4 text-white">
         {trip.leaveBy && <p className="text-sm text-white/70">Leave by <span className="font-semibold text-white">{fmtClock(trip.leaveBy)}</span> to make it</p>}
         <p className="text-sm text-white/70">{stopCount > 0 ? `${stopCount} stop${stopCount > 1 ? "s" : ""} along the way` : "Direct"}</p>
         <p className="mt-1 text-2xl font-bold leading-tight">Done at {fmtClock(last.arriveAt)}</p>
@@ -74,7 +74,7 @@ function StopRow({ stop }: { stop: TripStopResult }) {
       </div>
       <div className="min-w-0 flex-1 pb-1">
         <p className="font-semibold leading-tight">{stop.name}</p>
-        <p className="text-sm text-ink/70">
+        <p className="text-sm text-muted">
           {stop.role === "start" ? `Leave ${fmtClock(stop.departAt)}` : stop.role === "end" ? `Arrive ${fmtClock(stop.arriveAt)}` : `Arrive ${fmtClock(stop.arriveAt)} · leave ${fmtClock(stop.departAt)} (${stop.dwellMin} min)`}
         </p>
         {stop.open && <p className={`text-xs font-medium ${openStyle}`}>{stop.open.note}</p>}
@@ -92,23 +92,23 @@ function LegRow({ leg }: { leg: TripLeg }) {
       </div>
       <div className="min-w-0 flex-1 pb-3">
         <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex min-h-[44px] w-full flex-wrap items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-left text-sm">
-          {leg.lines.map((l) => <LineChip key={l} line={l} />)}
+          {leg.lines.map((l) => <LineBullet key={l} line={l} size={24} />)}
           {leg.mode === "walk" && <span className="rounded-full bg-black/10 px-2.5 py-1 text-xs font-semibold">Walk</span>}
           <span className="font-medium">{fmtDuration(leg.durationMin)}</span>
-          <span className="text-ink/60">{fmtClock(leg.departAt)} to {fmtClock(leg.arriveAt)}</span>
-          <span className="ml-auto text-ink/50" aria-hidden>{open ? "▲" : "▼"}</span>
+          <span className="text-muted">{fmtClock(leg.departAt)} to {fmtClock(leg.arriveAt)}</span>
+          <span className="ml-auto text-muted" aria-hidden>{open ? "▲" : "▼"}</span>
         </button>
         {open && (
           <div className="mt-1 space-y-1 rounded-lg bg-white px-3 py-2">
             <ol className="space-y-1.5">
               {leg.steps.map((s, i) => (
                 <li key={i} className="flex items-start gap-2 text-sm">
-                  <span className="w-16 shrink-0 text-xs tabular-nums text-ink/60">{fmtClock(s.startAt)}</span>
-                  <span>{s.label} <span className="text-ink/50">· {s.minutes} min</span></span>
+                  <span className="w-16 shrink-0 text-xs tabular-nums text-muted">{fmtClock(s.startAt)}</span>
+                  <span>{s.label} <span className="text-muted">· {s.minutes} min</span></span>
                 </li>
               ))}
             </ol>
-            <p className="pt-1 text-xs text-ink/50">{ACCURACY_NOTE[leg.accuracy]}</p>
+            <p className="pt-1 text-xs text-muted">{ACCURACY_NOTE[leg.accuracy]}</p>
           </div>
         )}
       </div>

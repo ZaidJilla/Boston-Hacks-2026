@@ -1,0 +1,153 @@
+// Server components for the restaurant detail page. They stream in after the rest of the page
+// (wrap them in <Suspense>) because the photo and details lookup can take a few seconds.
+import type { Restaurant } from "@/lib/geo";
+import { formatOsmHours } from "@/lib/hours";
+import { getPlaceDetails } from "@/lib/places";
+import PhotoGallery, { PhotoPlaceholder } from "./PhotoGallery";
+
+export function PhotosSkeleton() {
+  return <div className="aspect-[16/9] w-full animate-pulse rounded-card bg-panel" aria-busy="true" aria-label="Loading photos" />;
+}
+
+export async function RestaurantPhotos({ r }: { r: Restaurant }) {
+  const d = await getPlaceDetails(r);
+  if (!d.photos.length) return <PhotoPlaceholder name={r.name} category={r.category} categoryLabel={r.categoryLabel} />;
+  return (
+    <PhotoGallery
+      photos={d.photos}
+      name={r.name}
+      category={r.category}
+      categoryLabel={r.categoryLabel}
+      source={d.source}
+      sourceUrl={d.sourceUrl}
+    />
+  );
+}
+
+/** Google Maps search link for the place. Works without an API key. */
+function mapsSearchUrl(r: Restaurant): string {
+  const q = [r.name, r.address, "Boston, MA"].filter(Boolean).join(", ");
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+}
+
+function prettyHost(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+function safeHref(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" || u.protocol === "http:" ? u.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function Row({ icon, label, children }: { icon: string; label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex gap-3 py-2.5">
+      <span aria-hidden="true" className="w-5 shrink-0 text-center">{icon}</span>
+      <div className="min-w-0 flex-1">
+        <dt className="sr-only">{label}</dt>
+        <dd className="text-sm">{children}</dd>
+      </div>
+    </div>
+  );
+}
+
+const linkClass = "font-medium text-line-blue underline underline-offset-2 break-words";
+
+export function DetailsSkeleton() {
+  return (
+    <div className="space-y-3 rounded-card bg-panel p-3" aria-busy="true" aria-label="Loading details">
+      {[0, 1, 2].map((i) => <div key={i} className="h-4 animate-pulse rounded bg-panel" style={{ width: `${80 - i * 15}%` }} />)}
+    </div>
+  );
+}
+
+export async function RestaurantDetails({ r }: { r: Restaurant }) {
+  const d = await getPlaceDetails(r);
+  const website = safeHref(d.website ?? r.website);
+  const mapsUrl = safeHref(d.googleMapsUrl) ?? mapsSearchUrl(r);
+  const hours = d.hours?.length ? d.hours : formatOsmHours(r.openingHours);
+  const tel = r.phone?.replace(/[^\d+]/g, "");
+  const tags = [
+    r.diet.vegetarian && "Vegetarian options",
+    r.diet.vegan && "Vegan options",
+    r.diet.glutenFree && "Gluten-free options",
+    r.wheelchair === "yes" && "Wheelchair accessible",
+    r.wheelchair === "limited" && "Limited wheelchair access",
+  ].filter((t): t is string => Boolean(t));
+
+  return (
+    <div className="space-y-3">
+      {(d.rating !== undefined || d.openNow !== undefined) && (
+        <p className="flex flex-wrap items-center gap-2 text-sm">
+          {d.rating !== undefined && (
+            <span>
+              <span className="font-semibold">{d.rating.toFixed(1)}</span>
+              <span aria-hidden="true" className="text-line-orange"> ★</span>
+              {d.ratingCount !== undefined && (
+                <span className="text-muted"> ({d.ratingCount.toLocaleString("en-US")} on Google)</span>
+              )}
+            </span>
+          )}
+          {d.openNow !== undefined && (
+            <span
+              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                d.openNow ? "bg-line-green text-white" : "bg-line-red text-white"
+              }`}
+            >
+              {d.openNow ? "Open now" : "Closed now"}
+            </span>
+          )}
+        </p>
+      )}
+
+      {d.summary && <p className="text-[15px] leading-relaxed text-ink">{d.summary}</p>}
+
+      <section className="rounded-card bg-panel px-3 py-1" aria-labelledby="info-h">
+        <h2 id="info-h" className="sr-only">Details</h2>
+        <dl className="divide-y divide-hairline">
+          <Row icon="📍" label="Address">
+            <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
+              {r.address ? `${r.address}, ${r.neighborhoodName}` : `Open in Google Maps`}
+            </a>
+          </Row>
+          {website && (
+            <Row icon="🌐" label="Website">
+              <a href={website} target="_blank" rel="noopener noreferrer" className={linkClass}>
+                {prettyHost(website)}
+              </a>
+            </Row>
+          )}
+          {r.phone && tel && (
+            <Row icon="📞" label="Phone">
+              <a href={`tel:${tel}`} className={linkClass}>{r.phone}</a>
+            </Row>
+          )}
+          {hours.length > 0 && (
+            <Row icon="🕒" label="Hours">
+              <ul className="space-y-0.5">
+                {hours.map((h, i) => <li key={i}>{h}</li>)}
+              </ul>
+            </Row>
+          )}
+        </dl>
+      </section>
+
+      {tags.length > 0 && (
+        <ul className="flex flex-wrap gap-1.5" aria-label="Good to know">
+          {tags.map((t) => (
+            <li key={t} className="rounded-full bg-panel px-3 py-1.5 text-[13px] font-bold text-ink">{t}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}

@@ -55,4 +55,26 @@ CREATE TABLE IF NOT EXISTS quests (
   PRIMARY KEY (uid, line)
 );
 
--- Optional (Person 2, if time): continuous aggregate for the neighborhood leaderboard.
+-- Daily chunks line up with the daily aggregate below and "this week" queries.
+-- Only affects chunks created from now on, so it's safe to re-run.
+SELECT set_chunk_time_interval('checkins', INTERVAL '1 day');
+
+-- Continuous aggregate: check-ins per player per neighborhood per day. Powers the
+-- neighborhood leaderboard and the "check-ins over time" chart. materialized_only = false
+-- means real-time: rows newer than the last refresh are still included.
+CREATE MATERIALIZED VIEW IF NOT EXISTS checkins_daily
+WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
+SELECT time_bucket(INTERVAL '1 day', created_at) AS day,
+       neighborhood,
+       uid,
+       count(*) AS checkins
+  FROM checkins
+ WHERE verified
+ GROUP BY day, neighborhood, uid
+WITH NO DATA;
+
+SELECT add_continuous_aggregate_policy('checkins_daily',
+  start_offset      => INTERVAL '30 days',
+  end_offset        => INTERVAL '1 hour',
+  schedule_interval => INTERVAL '15 minutes',
+  if_not_exists     => TRUE);

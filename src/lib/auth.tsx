@@ -1,10 +1,13 @@
 "use client";
-// useUser(): real Google sign-in when Firebase is configured, a fake user in demo mode.
+// useUser(): real Google sign-in when Firebase is configured. The fake demo user is only used
+// when Firebase ISN'T configured (no-keys demo), so it never hides the real sign-in button.
+// Requests without a token still count as the demo player on the server in demo mode.
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 import { DEMO_MODE } from "./config";
 import { collegeFromEmail } from "./colleges";
 import { getClientAuth } from "./firebase";
+import { DEMO_USER } from "./demoUser";
 
 export interface AppUser {
   uid: string;
@@ -16,27 +19,28 @@ export interface AppUser {
 interface Ctx {
   user: AppUser | null;
   loading: boolean;
+  /** True when `user` is the built-in demo player, not a real Google account. */
+  isDemo: boolean;
   signIn: () => Promise<void>;
   signOutUser: () => Promise<void>;
+  /** Firebase ID token for `Authorization: Bearer ...`, or null when signed out / no Firebase. */
+  getIdToken: () => Promise<string | null>;
 }
 
-const DEMO_USER: AppUser = {
-  uid: "demo-user",
-  displayName: "Demo Student",
-  email: "demo@northeastern.edu",
-  college: "Northeastern",
-};
+const fallbackUser = (): AppUser | null => (DEMO_MODE ? DEMO_USER : null);
 
 const AuthContext = createContext<Ctx>({
   user: null,
   loading: true,
+  isDemo: false,
   signIn: async () => {},
   signOutUser: async () => {},
+  getIdToken: async () => null,
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const auth = getClientAuth();
-  const [user, setUser] = useState<AppUser | null>(auth ? null : DEMO_MODE ? DEMO_USER : null);
+  const [user, setUser] = useState<AppUser | null>(auth ? null : fallbackUser());
   const [loading, setLoading] = useState(Boolean(auth));
 
   useEffect(() => {
@@ -50,9 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               email: u.email ?? "",
               college: collegeFromEmail(u.email ?? ""),
             }
-          : DEMO_MODE
-            ? DEMO_USER
-            : null,
+          : null,
       );
       setLoading(false);
     });
@@ -60,15 +62,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async () => {
     if (auth) await signInWithPopup(auth, new GoogleAuthProvider());
-    else if (DEMO_MODE) setUser(DEMO_USER);
+    else setUser(fallbackUser());
   };
   const signOutUser = async () => {
     if (auth) await signOut(auth);
     setUser(null);
   };
+  const getIdToken = async () => (auth?.currentUser ? auth.currentUser.getIdToken() : null);
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, signOutUser }}>
+    <AuthContext.Provider
+      value={{ user, loading, isDemo: user?.uid === DEMO_USER.uid, signIn, signOutUser, getIdToken }}
+    >
       {children}
     </AuthContext.Provider>
   );
