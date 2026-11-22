@@ -1,5 +1,8 @@
 export const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
+/** Wordmark from the design. Working name until the domain is claimed; rename here only. */
+export const APP_NAME = "Unfog";
+
 export const LINE_COLORS = {
   red: "#DA291C",
   orange: "#ED8B00",

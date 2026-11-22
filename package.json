@@ -15,7 +15,8 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "solana:setup": "tsx scripts/solana-setup.ts",
     "data:all": "npm run data:hoods && npm run data:gtfs && npm run data:food",
-    "data:graph": "tsx scripts/graph.ts"
+    "data:graph": "tsx scripts/graph.ts",
+    "data:photos": "tsx scripts/photos.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.124",

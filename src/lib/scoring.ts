@@ -12,6 +12,9 @@ export const POINTS = {
 
 export const LINE_QUEST_STOPS = 5;
 
+/** Between midnight and this hour (Boston time), yesterday's receipt still counts. */
+export const RECEIPT_GRACE_HOURS = 4;
+
 // kg CO2 per km
 export const CO2_PER_KM = {
   rideshare: 0.25,

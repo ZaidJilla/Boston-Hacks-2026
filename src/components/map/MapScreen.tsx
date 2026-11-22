@@ -1,33 +1,97 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
-import { DEMO_MODE } from "@/lib/config";
+import { APP_NAME, BOSTON_CENTER } from "@/lib/config";
 import {
+  cravingById,
   DEFAULT_FILTERS,
+  distanceM,
   filterRestaurants,
+  LINE_ORDER,
+  lineColor,
   neighborhoodAt,
   neighborhoodById,
   neighborhoods,
   restaurants,
   restaurantsIn,
-  UNLOCK_THRESHOLD,
   type Restaurant,
   type RestaurantFilters,
 } from "@/lib/geo";
+import LineStripe from "@/components/signage/LineStripe";
+import { ChevronDownIcon, LocateIcon } from "@/components/signage/Icons";
 import FogMap, { boundsFor, type FlyTarget } from "./FogMap";
-import FilterSheet from "./FilterSheet";
-import RestaurantCard from "./RestaurantCard";
+import FilterSheet, { type FilterSection } from "./FilterSheet";
+import PeekCard from "./PeekCard";
 import { useUnlocked } from "./useUnlocked";
 import { useRankUp } from "./useRankUp";
-import RankBadge, { RANK_COLORS } from "@/components/rank/RankBadge";
+import RankBadge from "@/components/rank/RankBadge";
 import RankUpScreen from "@/components/rank/RankUpScreen";
 import { rankProgress } from "@/lib/scoring";
 
 const TOTAL_HOODS = neighborhoods.features.length;
 
-/** Straight-line distance from downtown, used to reject "near me" when the user isn't in Boston. */
+/** Straight-line distance from downtown, used to reject locations outside Boston. */
 function distanceFromBoston(lat: number, lng: number) {
   return Math.hypot((lat - 42.3505) * 111000, (lng + 71.0759) * 82000);
+}
+
+function locate(): Promise<{ lat: number; lng: number }> {
+  return new Promise((resolve, reject) => {
+    if (!("geolocation" in navigator)) return reject(new Error("Location isn't available on this device."));
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        const { latitude: lat, longitude: lng } = p.coords;
+        if (!neighborhoodAt(lat, lng) && distanceFromBoston(lat, lng) > 15000) {
+          reject(new Error("You're not in Boston. Pick a neighborhood instead."));
+        } else resolve({ lat, lng });
+      },
+      (err) =>
+        reject(new Error(err.code === err.PERMISSION_DENIED ? "Location permission was denied." : "Couldn't find you.")),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
+    );
+  });
+}
+
+/** "$ to $$", "$$", "$, $$$" */
+function priceSummary(prices: number[]): string {
+  const p = [...prices].sort();
+  if (!p.length) return "Price";
+  if (p.length > 1 && p[p.length - 1] - p[0] === p.length - 1) return `${"$".repeat(p[0])} to ${"$".repeat(p[p.length - 1])}`;
+  return p.map((n) => "$".repeat(n)).join(", ");
+}
+
+function cravingSummary(ids: RestaurantFilters["cravings"]): string {
+  if (!ids.length) return "Craving";
+  if (ids.length === 1) return cravingById.get(ids[0])?.label ?? "1 craving";
+  return `${ids.length} cravings`;
+}
+
+function FilterPill({
+  active,
+  onClick,
+  children,
+  label,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-haspopup="dialog"
+      className={`flex h-11 min-w-0 flex-auto items-center justify-center gap-1.5 rounded-full px-3.5 text-[15px] font-extrabold ${
+        active ? "bg-signal text-ink" : "bg-white text-ink"
+      }`}
+    >
+      {children}
+      <ChevronDownIcon size={16} className="shrink-0" />
+    </button>
+  );
 }
 
 export default function MapScreen() {
@@ -36,7 +100,7 @@ export default function MapScreen() {
   const { rankUp, dismiss: dismissRankUp } = useRankUp(uid, unlocked.size, loaded);
 
   const [filters, setFilters] = useState<RestaurantFilters>(DEFAULT_FILTERS);
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheet, setSheet] = useState<FilterSection | null>(null);
   const [selected, setSelected] = useState<Restaurant | null>(null);
   const [hoodInfo, setHoodInfo] = useState<string | null>(null);
   const [flyTo, setFlyTo] = useState<FlyTarget>(null);
@@ -55,36 +119,36 @@ export default function MapScreen() {
     }
   }, []);
 
+  const findMe = useCallback(async (): Promise<{ lat: number; lng: number } | null> => {
+    if (userPos) return userPos;
+    setLocating(true);
+    setLocateError(null);
+    try {
+      const pos = await locate();
+      setUserPos(pos);
+      return pos;
+    } catch (e) {
+      setLocateError((e as Error).message);
+      return null;
+    } finally {
+      setLocating(false);
+    }
+  }, [userPos]);
+
   const nearMe = useCallback(
-    (radiusM: number) => {
-      const apply = (lat: number, lng: number) => {
-        setUserPos({ lat, lng });
-        changeFilters({ ...filters, location: { kind: "near", lat, lng, radiusM } });
-        setFlyTo({ kind: "point", lat, lng, zoom: radiusM <= 400 ? 16 : radiusM <= 800 ? 15 : 14.5 });
-      };
-      if (userPos) return apply(userPos.lat, userPos.lng);
-      if (!("geolocation" in navigator)) return setLocateError("Location isn't available on this device.");
-      setLocating(true);
-      setLocateError(null);
-      navigator.geolocation.getCurrentPosition(
-        (p) => {
-          setLocating(false);
-          const { latitude: lat, longitude: lng } = p.coords;
-          if (!neighborhoodAt(lat, lng) && distanceFromBoston(lat, lng) > 15000) {
-            setLocateError("You're not in Boston. Pick a neighborhood instead.");
-            return;
-          }
-          apply(lat, lng);
-        },
-        (err) => {
-          setLocating(false);
-          setLocateError(err.code === err.PERMISSION_DENIED ? "Location permission was denied." : "Couldn't find you.");
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
-      );
+    async (radiusM: number) => {
+      const pos = await findMe();
+      if (!pos) return;
+      changeFilters({ ...filters, location: { kind: "near", lat: pos.lat, lng: pos.lng, radiusM } });
+      setFlyTo({ kind: "point", lat: pos.lat, lng: pos.lng, zoom: radiusM <= 400 ? 16 : radiusM <= 800 ? 15 : 14.5 });
     },
-    [filters, userPos, changeFilters],
+    [filters, findMe, changeFilters],
   );
+
+  const centerOnMe = useCallback(async () => {
+    const pos = await findMe();
+    if (pos) setFlyTo({ kind: "point", lat: pos.lat, lng: pos.lng, zoom: 15 });
+  }, [findMe]);
 
   const selectHood = useCallback((id: string) => {
     setHoodInfo(id);
@@ -94,91 +158,148 @@ export default function MapScreen() {
     setSelected(null);
     setHoodInfo(null);
   }, []);
+  const closeSheet = useCallback(() => setSheet(null), []);
 
-  const hood = hoodInfo ? neighborhoodById.get(hoodInfo) : null;
-  const hoodSpots = hood ? restaurantsIn(hood.properties.id) : [];
-  const hoodEaten = hoodSpots.filter((r) => checkins.has(r.id)).length;
+  // The peek card: the tapped spot, else the best spot in the tapped neighborhood, else the
+  // closest spot you haven't eaten at, preferring foggy neighborhoods.
+  const pick = useMemo(() => {
+    if (selected) return selected;
+    const anchor = userPos ?? { lat: BOSTON_CENTER[0], lng: BOSTON_CENTER[1] };
+    const pool = hoodInfo ? visible.filter((r) => r.neighborhood === hoodInfo) : visible;
+    const score = (r: Restaurant) =>
+      distanceM(r, anchor) + (checkins.has(r.id) ? 1e7 : 0) + (!hoodInfo && unlocked.has(r.neighborhood) ? 1e6 : 0);
+    return [...pool].sort((a, b) => score(a) - score(b))[0] ?? null;
+  }, [selected, hoodInfo, visible, userPos, checkins, unlocked]);
+
+  const pickHood = pick ? neighborhoodById.get(pick.neighborhood) : null;
+  const eaten = pick ? restaurantsIn(pick.neighborhood).filter((r) => checkins.has(r.id)).length : 0;
+  const tappedHoodName = hoodInfo ? neighborhoodById.get(hoodInfo)?.properties.name : null;
+
+  const lineFilter = filters.lines.length ? LINE_ORDER.filter((l) => filters.lines.includes(l)) : LINE_ORDER.slice(0, 4);
 
   return (
-    // fills the screen above the app's bottom nav (h-14)
-    <div className="fixed inset-x-0 bottom-14 top-0 overflow-hidden bg-fog">
+    // fills the screen above the app's bottom nav
+    // header first in the DOM so keyboard users reach the filters before the map
+    <div className="fixed inset-x-0 bottom-nav top-0 overflow-hidden bg-fog">
+      <header className="surface-dark absolute inset-x-0 top-0 z-[1000] bg-ink">
+        <div className="space-y-3 px-3 pb-3 pt-[calc(env(safe-area-inset-top)+12px)]">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span
+                className="flex h-9 w-9 items-center justify-center rounded-[10px] bg-white text-[22px] font-black leading-none text-ink"
+                aria-hidden="true"
+              >
+                {APP_NAME[0]}
+              </span>
+              <h1 className="text-[24px] font-black tracking-[-1px] text-white">{APP_NAME}</h1>
+            </div>
+            <Link
+              href="/profile"
+              aria-label={`${rank.name}, ${unlocked.size} of ${TOTAL_HOODS} neighborhoods unlocked${
+                next ? `, ${unlocksToNext} more to ${next.name}` : ""
+              }`}
+              className="flex min-h-[44px] shrink-0 items-center gap-2 rounded-full bg-white px-3 text-[14px] font-extrabold text-ink"
+            >
+              <RankBadge rank={rank} />
+              <span aria-hidden="true">
+                {unlocked.size} of {TOTAL_HOODS}
+              </span>
+            </Link>
+          </div>
+
+          <div className="flex gap-2">
+            <FilterPill
+              active={filters.cravings.length > 0}
+              onClick={() => setSheet("craving")}
+              label={`Craving filter: ${filters.cravings.length ? cravingSummary(filters.cravings) : "any"}`}
+            >
+              <span className="truncate">{cravingSummary(filters.cravings)}</span>
+            </FilterPill>
+            <FilterPill
+              active={filters.prices.length > 0}
+              onClick={() => setSheet("price")}
+              label={`Price filter: ${filters.prices.length ? priceSummary(filters.prices) : "any"}`}
+            >
+              <span className="truncate">{priceSummary(filters.prices)}</span>
+            </FilterPill>
+            <FilterPill
+              active={filters.lines.length > 0}
+              onClick={() => setSheet("line")}
+              label={`T line filter: ${filters.lines.length ? filters.lines.join(", ") : "any"}`}
+            >
+              <span className="flex shrink-0 -space-x-0.5" aria-hidden="true">
+                {lineFilter.map((l) => (
+                  <span key={l} className="h-2.5 w-2.5 rounded-full ring-1 ring-white" style={{ background: lineColor(l) }} />
+                ))}
+              </span>
+              <span className="truncate">T line</span>
+            </FilterPill>
+          </div>
+        </div>
+        <LineStripe />
+      </header>
+
       <FogMap
         restaurants={visible}
         unlocked={unlocked}
+        visited={checkins}
         selectedId={selected?.id ?? null}
         userPos={userPos}
         flyTo={flyTo}
         onSelectRestaurant={(r) => {
           setSelected(r);
           setHoodInfo(null);
-          setSheetOpen(false);
         }}
         onSelectNeighborhood={selectHood}
         onMapTap={clearSelection}
       />
 
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-[1000] flex items-start justify-between gap-2 p-3 pt-[calc(env(safe-area-inset-top)+12px)]">
-        <div className="pointer-events-auto rounded-2xl bg-white/95 px-3.5 py-2 shadow-md ring-1 ring-black/10">
-          <p className="flex items-center gap-2 text-sm text-ink">
-            <RankBadge rank={rank} />
-            <span>
-              <span className="font-bold">{unlocked.size}</span> of {TOTAL_HOODS} unlocked
-            </span>
+      <div className="pointer-events-none absolute inset-x-3 bottom-3 z-[1000] mx-auto flex max-w-md flex-col items-end gap-3">
+        <button
+          type="button"
+          onClick={centerOnMe}
+          aria-label={locating ? "Finding your location" : "Show my location"}
+          className="pointer-events-auto flex h-12 w-12 items-center justify-center rounded-full bg-white text-line-blue shadow-soft"
+        >
+          <LocateIcon size={24} />
+        </button>
+        {locateError && !sheet && (
+          <p role="alert" className="pointer-events-auto w-full rounded-card bg-ink px-4 py-2.5 text-[14px] font-bold text-white">
+            {locateError}
           </p>
-          {/* progress toward the next rank, in that rank's color */}
-          <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-black/10" aria-hidden>
-            <div
-              className="h-full"
-              style={{
-                background: RANK_COLORS[(next ?? rank).id],
-                width: `${
-                  next ? ((unlocked.size - rank.minUnlocks) / (next.minUnlocks - rank.minUnlocks)) * 100 : 100
-                }%`,
-              }}
-            />
-          </div>
-          <p className="mt-1 text-[11px] text-ink/60">
-            {next ? `${unlocksToNext} more to ${next.name}` : "Top rank reached"}
-          </p>
-        </div>
-        {DEMO_MODE && (
-          <span className="pointer-events-auto rounded-full bg-line-orange px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm">
-            Demo
-          </span>
         )}
-      </header>
-
-      {hood && !selected && (
-        <div className="fixed inset-x-3 bottom-[164px] z-[1001] mx-auto max-w-md rounded-2xl bg-white p-4 shadow-xl ring-1 ring-black/10">
-          <p className="text-xs font-medium text-ink/60">{unlocked.has(hood.properties.id) ? "Unlocked" : "Still foggy"}</p>
-          <h2 className="text-lg font-bold text-ink">{hood.properties.name}</h2>
-          <p className="text-sm text-ink/70">
-            {hoodSpots.length} spots
-            {!unlocked.has(hood.properties.id) &&
-              ` · eat at ${Math.max(0, UNLOCK_THRESHOLD - hoodEaten)} more to unlock`}
-          </p>
-          <button
-            type="button"
-            className="mt-3 min-h-[44px] w-full rounded-xl bg-ink text-sm font-semibold text-white"
-            onClick={() => {
-              changeFilters({ ...filters, location: { kind: "neighborhood", id: hood.properties.id } });
-              setHoodInfo(null);
-            }}
-          >
-            Show spots here
-          </button>
+        <div className="pointer-events-auto w-full">
+          {pick && pickHood ? (
+            <PeekCard
+              r={pick}
+              hoodName={pickHood.properties.name}
+              unlocked={unlocked.has(pick.neighborhood)}
+              eaten={eaten}
+            />
+          ) : (
+            <div className="rounded-card bg-white p-4 shadow-card">
+              <p className="text-[18px] font-black tracking-[-0.5px]">
+                {tappedHoodName ? `No spots in ${tappedHoodName} match` : "No spots match"}
+              </p>
+              <p className="text-[14px] text-muted">Try fewer filters.</p>
+              <button
+                type="button"
+                onClick={() => changeFilters(DEFAULT_FILTERS)}
+                className="mt-3 min-h-[44px] rounded-full bg-ink px-5 text-[15px] font-extrabold text-white"
+              >
+                Clear filters
+              </button>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       {rankUp && <RankUpScreen rank={rankUp} unlocked={unlocked.size} onClose={dismissRankUp} />}
 
-      {selected && (
-        <RestaurantCard r={selected} unlocked={unlocked.has(selected.neighborhood)} onClose={() => setSelected(null)} />
-      )}
-
       <FilterSheet
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
+        open={sheet !== null}
+        focusSection={sheet ?? "craving"}
+        onClose={closeSheet}
         filters={filters}
         onChange={changeFilters}
         resultCount={visible.length}

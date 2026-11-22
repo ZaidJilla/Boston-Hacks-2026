@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+import { buttonClass, chipClass } from "@/components/ui/Button";
+import { lineTextColor } from "@/components/signage/LineBullet";
 import {
-  activeFilterCount,
   cravings,
   DEFAULT_FILTERS,
   LINE_ORDER,
@@ -12,9 +14,13 @@ import {
   type RestaurantFilters,
 } from "@/lib/geo";
 
+export type FilterSection = "craving" | "price" | "line";
+
 interface Props {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  /** section to scroll to when the sheet opens */
+  focusSection: FilterSection;
+  onClose: () => void;
   filters: RestaurantFilters;
   onChange: (f: RestaurantFilters) => void;
   resultCount: number;
@@ -41,31 +47,31 @@ function Chip({
   onClick,
   children,
   activeColor,
+  activeText,
 }: {
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
   activeColor?: string;
+  activeText?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       aria-pressed={active}
-      style={active && activeColor ? { background: activeColor, borderColor: activeColor } : undefined}
-      className={`min-h-[44px] shrink-0 rounded-full border px-3.5 text-sm font-medium transition-colors ${
-        active ? "border-ink bg-ink text-white" : "border-black/20 bg-white text-ink active:bg-black/5"
-      }`}
+      style={active && activeColor ? { background: activeColor, borderColor: activeColor, color: activeText } : undefined}
+      className={chipClass(active)}
     >
       {children}
     </button>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
   return (
-    <section className="space-y-2">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-ink/60">{title}</h3>
+    <section id={id} className="scroll-mt-4 space-y-2.5" aria-labelledby={`${id}-h`}>
+      <h3 id={`${id}-h`} className="eyebrow text-muted">{title}</h3>
       {children}
     </section>
   );
@@ -73,7 +79,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export default function FilterSheet({
   open,
-  onOpenChange,
+  focusSection,
+  onClose,
   filters,
   onChange,
   resultCount,
@@ -83,61 +90,59 @@ export default function FilterSheet({
   locateError,
 }: Props) {
   const toggle = <T,>(list: T[], v: T) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
-  const count = activeFilterCount(filters);
   const loc = filters.location;
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  // Latest values without re-running the open effect on every filter change.
+  const latest = useRef({ focusSection, onClose });
+  latest.current = { focusSection, onClose };
+
+  useEffect(() => {
+    if (!open) return;
+    headingRef.current?.focus();
+    document.getElementById(`filter-${latest.current.focusSection}`)?.scrollIntoView({ block: "start" });
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && latest.current.onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  if (!open) return null;
 
   return (
-    // sits on top of the app's bottom nav (h-14)
-    <div
-      className={`fixed inset-x-0 bottom-14 z-[1001] mx-auto flex max-w-md flex-col overflow-hidden rounded-t-3xl bg-white shadow-[0_-8px_30px_rgba(20,24,28,0.18)] transition-[max-height] duration-300 ${
-        open ? "max-h-[calc(100dvh-8rem)]" : "max-h-[92px]"
-      }`}
-    >
-      {/* Handle + summary: the whole row toggles the sheet */}
-      <button
-        type="button"
-        onClick={() => onOpenChange(!open)}
-        aria-expanded={open}
-        className="flex w-full flex-col items-center px-5 pb-3 pt-2"
+    <>
+      <div className="fixed inset-x-0 bottom-nav top-0 z-[1001] bg-black/40" onClick={onClose} aria-hidden="true" />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="filters-h"
+        className="fixed inset-x-0 bottom-nav z-[1002] mx-auto flex max-h-[calc(100dvh-140px)] max-w-md flex-col overflow-hidden rounded-t-sheet bg-white shadow-card"
       >
-        <span className="mb-2 h-1.5 w-10 rounded-full bg-black/20" />
-        <span className="flex w-full items-center justify-between">
-          <span className="text-left">
-            <span className="block text-base font-bold text-ink">
-              {resultCount} {resultCount === 1 ? "spot" : "spots"}
-            </span>
-            <span className="block text-xs text-ink/60">
-              {count ? `${count} filter${count > 1 ? "s" : ""} on` : "What are you craving?"}
-            </span>
-          </span>
-          <span className="flex min-h-[44px] items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white">
-            {open ? "Done" : "Filters"}
-            {!open && count > 0 && (
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-line-red text-[11px]">{count}</span>
-            )}
-          </span>
-        </span>
-      </button>
+        <div className="flex items-center justify-between px-5 pb-2 pt-4">
+          <h2 id="filters-h" ref={headingRef} tabIndex={-1} className="text-[22px] font-black tracking-[-0.5px]">
+            Filters
+          </h2>
+          <button type="button" onClick={onClose} className={chipClass(true)}>
+            Done
+          </button>
+        </div>
 
-      {open && (
-        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 pb-4">
-          <Section title="Craving">
-            <div className="flex flex-wrap gap-2">
+        <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-5 pb-4 pt-2">
+          <Section id="filter-craving" title="Craving">
+            <div className="flex flex-wrap gap-2.5">
               {cravings.map((c) => (
                 <Chip
                   key={c.id}
                   active={filters.cravings.includes(c.id)}
                   onClick={() => onChange({ ...filters, cravings: toggle(filters.cravings, c.id) })}
                 >
-                  <span className="mr-1">{c.emoji}</span>
+                  <span aria-hidden="true">{c.emoji}</span>
                   {c.label}
                 </Chip>
               ))}
             </div>
           </Section>
 
-          <Section title="Budget">
-            <div className="grid grid-cols-3 gap-2">
+          <Section id="filter-price" title="Budget">
+            <div className="flex flex-wrap gap-2.5">
               {([1, 2, 3] as PriceTier[]).map((p) => (
                 <Chip
                   key={p}
@@ -145,14 +150,14 @@ export default function FilterSheet({
                   onClick={() => onChange({ ...filters, prices: toggle(filters.prices, p) })}
                 >
                   {"$".repeat(p)}
-                  <span className="ml-1 text-xs opacity-70">{p === 1 ? "under $15" : p === 2 ? "$15–30" : "$30+"}</span>
+                  <span className="font-semibold">{p === 1 ? "under $15" : p === 2 ? "$15–30" : "$30+"}</span>
                 </Chip>
               ))}
             </div>
           </Section>
 
-          <Section title="Location">
-            <div className="grid grid-cols-3 gap-2">
+          <Section id="filter-location" title="Location">
+            <div className="flex flex-wrap gap-2.5">
               <Chip active={loc.kind === "anywhere"} onClick={() => onChange({ ...filters, location: { kind: "anywhere" } })}>
                 Anywhere
               </Chip>
@@ -168,12 +173,12 @@ export default function FilterSheet({
                   })
                 }
               >
-                Area
+                Neighborhood
               </Chip>
             </div>
 
             {loc.kind === "near" && (
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2.5">
                 {RADII.map((r) => (
                   <Chip key={r.m} active={loc.radiusM === r.m} onClick={() => onNearMe(r.m)}>
                     {r.label} walk
@@ -182,7 +187,7 @@ export default function FilterSheet({
               </div>
             )}
             {locateError && (
-              <p role="alert" className="text-sm text-line-red">
+              <p role="alert" className="text-[14px] font-semibold text-line-red">
                 {locateError}
               </p>
             )}
@@ -196,7 +201,7 @@ export default function FilterSheet({
                   id="hood"
                   value={loc.id}
                   onChange={(e) => onChange({ ...filters, location: { kind: "neighborhood", id: e.target.value } })}
-                  className="min-h-[44px] w-full rounded-xl border border-black/20 bg-white px-3 text-base"
+                  className="min-h-[48px] w-full rounded-full border-2 border-ink bg-white px-4 text-[16px] font-semibold"
                 >
                   {hoodOptions.map((h) => (
                     <option key={h.id} value={h.id}>
@@ -209,28 +214,32 @@ export default function FilterSheet({
             )}
           </Section>
 
-          <Section title="T line">
-            <div className="flex flex-wrap gap-2">
-              {LINE_ORDER.map((l) => (
-                <Chip
-                  key={l}
-                  active={filters.lines.includes(l)}
-                  activeColor={lineColor(l)}
-                  onClick={() => onChange({ ...filters, lines: toggle(filters.lines, l) })}
-                >
-                  <span
-                    aria-hidden
-                    className="mr-1.5 inline-block h-2.5 w-2.5 rounded-full align-middle"
-                    style={{ background: filters.lines.includes(l) ? "#fff" : lineColor(l) }}
-                  />
-                  {LINE_LABEL[l]}
-                </Chip>
-              ))}
+          <Section id="filter-line" title="T line">
+            <div className="flex flex-wrap gap-2.5">
+              {LINE_ORDER.map((l) => {
+                const on = filters.lines.includes(l);
+                return (
+                  <Chip
+                    key={l}
+                    active={on}
+                    activeColor={lineColor(l)}
+                    activeText={lineTextColor(l)}
+                    onClick={() => onChange({ ...filters, lines: toggle(filters.lines, l) })}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="inline-block h-3 w-3 rounded-full"
+                      style={{ background: on ? lineTextColor(l) : lineColor(l) }}
+                    />
+                    {LINE_LABEL[l]}
+                  </Chip>
+                );
+              })}
             </div>
           </Section>
 
-          <label className="flex min-h-[44px] items-center justify-between rounded-xl bg-paper px-3">
-            <span className="text-sm font-medium text-ink">Local spots only (hide chains)</span>
+          <label className="flex min-h-[48px] items-center justify-between gap-3 rounded-card bg-panel px-4">
+            <span className="text-[15px] font-bold">Local spots only (hide chains)</span>
             <input
               type="checkbox"
               checked={filters.hideChains}
@@ -239,26 +248,16 @@ export default function FilterSheet({
             />
           </label>
         </div>
-      )}
 
-      {open && (
-        <div className="flex gap-2 border-t border-black/5 bg-white px-5 pb-3 pt-3">
-          <button
-            type="button"
-            onClick={() => onChange(DEFAULT_FILTERS)}
-            className="min-h-[48px] flex-1 rounded-2xl border border-black/20 text-sm font-semibold text-ink"
-          >
+        <div className="flex gap-2.5 border-t-2 border-ink bg-white px-5 py-3">
+          <button type="button" onClick={() => onChange(DEFAULT_FILTERS)} className={`${buttonClass("outline")} flex-1 !px-3`}>
             Reset
           </button>
-          <button
-            type="button"
-            onClick={() => onOpenChange(false)}
-            className="min-h-[48px] flex-[2] rounded-2xl bg-line-blue text-sm font-semibold text-white"
-          >
-            Show {resultCount} spots
+          <button type="button" onClick={onClose} className={`${buttonClass("primary")} flex-[2] !px-3`}>
+            Show {resultCount} {resultCount === 1 ? "spot" : "spots"}
           </button>
         </div>
-      )}
-    </div>
+      </div>
+    </>
   );
 }
