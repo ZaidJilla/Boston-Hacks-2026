@@ -7,7 +7,7 @@ import { DEFAULT_ORIGIN, DEMO_MODE, LINE_COLORS } from "./config";
 import { getStation, lines as allLines } from "./data";
 import { getPool, withTransaction } from "./db";
 import { distanceKm } from "./geo";
-import { LINE_QUEST_STOPS, UNLOCK_THRESHOLD, co2SavedKg, isUnlocked, pointsForCheckin } from "./scoring";
+import { LINE_QUEST_STOPS, UNLOCK_THRESHOLD, co2SavedKg, isUnlocked, scoreCheckin, type PointsBreakdown } from "./scoring";
 import { buildSeedPlayers } from "./seedData";
 import type { CheckinDoc, LeaderboardRow, LineId, Profile, Restaurant, UserDoc } from "./types";
 
@@ -29,6 +29,8 @@ export interface RecordCheckinInput {
   lat: number;
   lng: number;
   co2SavedKg: number;
+  /** How far this place is from the player's home, for the distance multiplier. Default: unknown. */
+  distance?: { stopsFromHome: number | null; inHomeNeighborhood: boolean };
   /** Defaults to now. The seed script backdates check-ins to build history. */
   createdAt?: Date;
 }
@@ -38,6 +40,8 @@ export type RecordCheckinOutcome =
       ok: true;
       checkinId: string;
       pointsEarned: number;
+      /** Every line of how pointsEarned was made. */
+      breakdown: PointsBreakdown;
       totalPoints: number;
       unlockedNeighborhood?: string;
       questCompleted?: LineId;
@@ -170,7 +174,7 @@ export function memLeaderboard(): LeaderboardRow[] {
     .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
 }
 
-function memRecord({ user, restaurant: r, lines, lat, lng, co2SavedKg, createdAt }: RecordCheckinInput): RecordCheckinOutcome {
+function memRecord({ user, restaurant: r, lines, lat, lng, co2SavedKg, distance, createdAt }: RecordCheckinInput): RecordCheckinOutcome {
   if (mem.checkins.some((c) => c.uid === user.uid && c.restaurantId === r.id)) {
     return { ok: false, reason: "already_checked_in" };
   }
@@ -184,6 +188,9 @@ function memRecord({ user, restaurant: r, lines, lat, lng, co2SavedKg, createdAt
     co2SavedKg: 0,
     createdAt: Date.now(),
   };
+
+  // First visit anywhere in this neighborhood? (Checked before this check-in is added.)
+  const newNeighborhood = !mem.checkins.some((c) => c.uid === user.uid && c.neighborhood === r.neighborhood);
 
   const checkinId = String(mem.nextId++);
   mem.checkins.push({
@@ -207,8 +214,10 @@ function memRecord({ user, restaurant: r, lines, lat, lng, co2SavedKg, createdAt
 
   // Line quests: add this stop to every line that serves it.
   let questCompleted: LineId | undefined;
+  let newLine = false;
   for (const line of lines) {
     const key = `${user.uid}:${line}`;
+    if (!mem.quests.has(key)) newLine = true; // a line this player has never visited
     const q = mem.quests.get(key) ?? { stopIds: new Set<string>(), completed: false };
     q.stopIds.add(r.nearestStopId);
     if (!q.completed && q.stopIds.size >= LINE_QUEST_STOPS) {
@@ -218,11 +227,16 @@ function memRecord({ user, restaurant: r, lines, lat, lng, co2SavedKg, createdAt
     mem.quests.set(key, q);
   }
 
-  const pointsEarned = pointsForCheckin({
+  const breakdown = scoreCheckin({
     isChain: r.isChain,
     unlockedNeighborhood: newlyUnlocked,
     questCompleted: Boolean(questCompleted),
+    stopsFromHome: distance?.stopsFromHome ?? null,
+    inHomeNeighborhood: distance?.inHomeNeighborhood ?? false,
+    newNeighborhood,
+    newLine,
   });
+  const pointsEarned = breakdown.total;
   u.points += pointsEarned;
   u.co2SavedKg = Math.round((u.co2SavedKg + co2SavedKg) * 100) / 100;
   mem.users.set(user.uid, u);
@@ -231,6 +245,7 @@ function memRecord({ user, restaurant: r, lines, lat, lng, co2SavedKg, createdAt
     ok: true,
     checkinId,
     pointsEarned,
+    breakdown,
     totalPoints: u.points,
     unlockedNeighborhood: newlyUnlocked ? r.neighborhood : undefined,
     questCompleted,
@@ -280,7 +295,7 @@ const memStore: GameStore = {
 // ---------- Tiger Data backend ----------
 
 const pgStore: GameStore = {
-  async recordCheckin({ user, restaurant: r, lines, lat, lng, co2SavedKg, createdAt }) {
+  async recordCheckin({ user, restaurant: r, lines, lat, lng, co2SavedKg, distance, createdAt }) {
     const at = createdAt ?? new Date();
 
     return withTransaction(async (db): Promise<RecordCheckinOutcome> => {
@@ -315,6 +330,8 @@ const pgStore: GameStore = {
          WHERE uid = $1 AND neighborhood = $2 AND verified`,
         [user.uid, r.neighborhood],
       );
+      // This check-in is already in the count, so n === 1 means it was the first visit in the neighborhood.
+      const newNeighborhood = count.rows[0].n === 1;
       let newlyUnlocked = false;
       if (isUnlocked(count.rows[0].n)) {
         const unlock = await db.query(
@@ -327,15 +344,17 @@ const pgStore: GameStore = {
 
       // 5. Line quests: add this stop to each line's set; complete at LINE_QUEST_STOPS.
       let questCompleted: LineId | undefined;
+      let newLine = false;
       for (const line of lines) {
-        const q = await db.query<{ n: number; completed: boolean }>(
+        const q = await db.query<{ n: number; completed: boolean; fresh: boolean }>(
           `INSERT INTO quests (uid, line, stop_ids) VALUES ($1, $2, ARRAY[$3]::text[])
            ON CONFLICT (uid, line) DO UPDATE
              SET stop_ids = ARRAY(SELECT DISTINCT unnest(quests.stop_ids || EXCLUDED.stop_ids))
-           RETURNING cardinality(stop_ids) AS n, completed`,
+           RETURNING cardinality(stop_ids) AS n, completed, (xmax = 0) AS fresh`, // fresh = a new row = a line never visited
           [user.uid, line, r.nearestStopId],
         );
-        const { n, completed } = q.rows[0];
+        const { n, completed, fresh } = q.rows[0];
+        if (fresh) newLine = true;
         if (!completed && n >= LINE_QUEST_STOPS) {
           await db.query(`UPDATE quests SET completed = true WHERE uid = $1 AND line = $2`, [user.uid, line]);
           questCompleted ??= line; // one quest bonus per check-in
@@ -343,11 +362,16 @@ const pgStore: GameStore = {
       }
 
       // 6. Points and CO2.
-      const pointsEarned = pointsForCheckin({
+      const breakdown = scoreCheckin({
         isChain: r.isChain,
         unlockedNeighborhood: newlyUnlocked,
         questCompleted: Boolean(questCompleted),
+        stopsFromHome: distance?.stopsFromHome ?? null,
+        inHomeNeighborhood: distance?.inHomeNeighborhood ?? false,
+        newNeighborhood,
+        newLine,
       });
+      const pointsEarned = breakdown.total;
       const updated = await db.query<{ points: number }>(
         `UPDATE users SET points = points + $2, co2_saved_kg = co2_saved_kg + $3
          WHERE uid = $1 RETURNING points`,
@@ -358,6 +382,7 @@ const pgStore: GameStore = {
         ok: true,
         checkinId,
         pointsEarned,
+        breakdown,
         totalPoints: updated.rows[0].points,
         unlockedNeighborhood: newlyUnlocked ? r.neighborhood : undefined,
         questCompleted,

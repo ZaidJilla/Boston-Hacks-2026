@@ -7,6 +7,7 @@ import { DEMO_MODE } from "@/lib/config";
 import { getRestaurant } from "@/lib/data";
 import { distanceMeters } from "@/lib/geo";
 import { verifyReceipt } from "@/lib/gemini";
+import { distanceFromHome } from "@/lib/economy";
 import { CHECKIN_RADIUS_M } from "@/lib/scoring";
 import { checkinFacts, getStore } from "@/lib/store";
 import type { CheckinRequest, CheckinResult } from "@/lib/types";
@@ -80,7 +81,7 @@ export async function POST(req: Request) {
   // 3. Store
   let outcome;
   try {
-    outcome = await store.recordCheckin({ user, restaurant: r, lines, lat, lng, co2SavedKg: co2 });
+    outcome = await store.recordCheckin({ user, restaurant: r, lines, lat, lng, co2SavedKg: co2, distance: distanceFromHome(user.uid, r) });
   } catch (err) {
     console.error("recordCheckin failed", err);
     return fail("Couldn't save your check-in, try again", 500);
@@ -91,6 +92,7 @@ export async function POST(req: Request) {
   return NextResponse.json({
     ok: true,
     pointsEarned: outcome.pointsEarned,
+    breakdown: outcome.breakdown,
     totalPoints: outcome.totalPoints,
     unlockedNeighborhood: outcome.unlockedNeighborhood,
     questCompleted: outcome.questCompleted,

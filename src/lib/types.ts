@@ -1,5 +1,7 @@
 // Shared contract. Change only after telling the team.
 
+import type { PointsBreakdown } from "./scoring";
+
 export type LineId = "red" | "orange" | "green" | "blue" | "silver";
 
 export type Craving =
@@ -113,6 +115,8 @@ export interface CheckinResult {
   ok: boolean;
   error?: string;
   pointsEarned: number;
+  /** How pointsEarned was made, line by line (distance multiplier, bonuses). */
+  breakdown?: PointsBreakdown;
   totalPoints: number;
   unlockedNeighborhood?: string;
   questCompleted?: LineId;

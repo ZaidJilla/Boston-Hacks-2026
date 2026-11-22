@@ -5,11 +5,35 @@ export const CHECKIN_RADIUS_M = 50;
 export const UNLOCK_THRESHOLD = 3;
 
 export const POINTS = {
+  /** Base points for a visit, before the distance multiplier. */
   checkin: 10,
+  /** The check-in that makes 3 distinct places in a neighborhood. */
   unlock: 50,
   independent: 5,
   lineQuest: 25,
+  /** Your first visit anywhere in a neighborhood. */
+  newNeighborhood: 50,
+  /** First visit to a place whose nearest station is on a line you have never visited. */
+  newLine: 25,
 } as const;
+
+// ---- Exploring pays: the farther from home, the more a visit is worth ----
+
+/** Visits in your own neighborhood are worth half: the game is about going somewhere new. */
+export const HOME_NEIGHBORHOOD_MULTIPLIER = 0.5;
+
+/** By subway stops from your home station to the place's nearest station. First tier that fits wins. */
+export const DISTANCE_TIERS = [
+  { maxStops: 4, multiplier: 1, label: "Close to home" },
+  { maxStops: 9, multiplier: 1.5, label: "Across town" },
+  { maxStops: Infinity, multiplier: 2, label: "Far from home" },
+] as const;
+
+export function distanceMultiplier(stopsFromHome: number | null, inHomeNeighborhood: boolean): number {
+  if (inHomeNeighborhood) return HOME_NEIGHBORHOOD_MULTIPLIER;
+  if (stopsFromHome === null) return 1; // no home set, or no subway station to measure from
+  return DISTANCE_TIERS.find((t) => stopsFromHome <= t.maxStops)!.multiplier;
+}
 
 export const LINE_QUEST_STOPS = 5;
 
@@ -34,15 +58,65 @@ export interface PointsInput {
   isChain: boolean;
   unlockedNeighborhood: boolean;
   questCompleted: boolean;
+  /** Subway stops from the player's home station to this place's nearest station (null = unknown). */
+  stopsFromHome?: number | null;
+  inHomeNeighborhood?: boolean;
+  newNeighborhood?: boolean;
+  newLine?: boolean;
+}
+
+/** Everything a check-in earned, line by line, so the UI can show its work. */
+export interface PointsBreakdown {
+  base: number;
+  multiplier: number;
+  stopsFromHome: number | null;
+  inHomeNeighborhood: boolean;
+  /** base x multiplier, rounded */
+  distancePoints: number;
+  independent: number;
+  newNeighborhood: number;
+  newLine: number;
+  unlock: number;
+  lineQuest: number;
+  total: number;
+}
+
+export function scoreCheckin(i: PointsInput): PointsBreakdown {
+  const stopsFromHome = i.stopsFromHome ?? null;
+  const inHomeNeighborhood = Boolean(i.inHomeNeighborhood);
+  const multiplier = distanceMultiplier(stopsFromHome, inHomeNeighborhood);
+  const distancePoints = Math.round(POINTS.checkin * multiplier);
+  const independent = i.isChain ? 0 : POINTS.independent;
+  const newNeighborhood = i.newNeighborhood ? POINTS.newNeighborhood : 0;
+  const newLine = i.newLine ? POINTS.newLine : 0;
+  const unlock = i.unlockedNeighborhood ? POINTS.unlock : 0;
+  const lineQuest = i.questCompleted ? POINTS.lineQuest : 0;
+  return {
+    base: POINTS.checkin, multiplier, stopsFromHome, inHomeNeighborhood, distancePoints,
+    independent, newNeighborhood, newLine, unlock, lineQuest,
+    total: distancePoints + independent + newNeighborhood + newLine + unlock + lineQuest,
+  };
 }
 
 export function pointsForCheckin(i: PointsInput): number {
-  return (
-    POINTS.checkin +
-    (i.isChain ? 0 : POINTS.independent) +
-    (i.unlockedNeighborhood ? POINTS.unlock : 0) +
-    (i.questCompleted ? POINTS.lineQuest : 0)
-  );
+  return scoreCheckin(i).total;
+}
+
+/** "Base 10 x 2 (12 stops from home) + New neighborhood 50 + New line 25 = 95" */
+export function describeBreakdown(b: PointsBreakdown): string {
+  const parts = [
+    b.multiplier === 1
+      ? `Base ${b.base}`
+      : `Base ${b.base} × ${b.multiplier}${
+          b.inHomeNeighborhood ? " (home neighborhood)" : b.stopsFromHome !== null ? ` (${b.stopsFromHome} stops from home)` : ""
+        }`,
+    b.independent && `Independent ${b.independent}`,
+    b.newNeighborhood && `New neighborhood ${b.newNeighborhood}`,
+    b.newLine && `New line ${b.newLine}`,
+    b.unlock && `Unlock ${b.unlock}`,
+    b.lineQuest && `Line quest ${b.lineQuest}`,
+  ].filter(Boolean);
+  return `${parts.join(" + ")} = ${b.total}`;
 }
 
 // ---- Home base ----

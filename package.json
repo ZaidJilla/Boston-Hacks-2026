@@ -17,7 +17,9 @@
     "data:all": "npm run data:hoods && npm run data:gtfs && npm run data:food && npm run data:places",
     "data:graph": "tsx scripts/graph.ts",
     "data:photos": "tsx scripts/photos.ts",
-    "test:trip": "tsx scripts/test-trip.ts"
+    "test:trip": "tsx scripts/test-trip.ts",
+    "test:scoring": "tsx scripts/test-scoring.ts",
+    "test:economy": "tsx scripts/test-economy.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.124",
