@@ -15,6 +15,7 @@ import { useUser } from "@/lib/auth";
 import { LINE_COLORS } from "@/lib/config";
 import { factsFrom } from "@/lib/badges";
 import { hoodRankFor, rankProgress } from "@/lib/scoring";
+import { HoodTitlePill } from "@/components/rank/HoodMedallion";
 import { stations } from "@/lib/data";
 import type { HomeResult, Profile } from "@/lib/types";
 
@@ -178,11 +179,7 @@ export default function ProfilePage() {
                     <div className="mb-2 flex items-center justify-between gap-3">
                       <span className="flex min-w-0 items-center gap-2">
                         <span className="truncate text-[16px] font-extrabold">{n.name}</span>
-                        {hoodRankFor(n.spots) && (
-                          <span className="shrink-0 rounded-full bg-panel px-2 py-0.5 text-[11px] font-black uppercase tracking-[0.4px]">
-                            {hoodRankFor(n.spots)?.name}
-                          </span>
-                        )}
+                        {hoodRankFor(n.spots) && <HoodTitlePill id={hoodRankFor(n.spots)!.id} name={hoodRankFor(n.spots)!.name} />}
                       </span>
                       <span
                         className={`shrink-0 rounded-full px-2.5 py-0.5 text-[12px] font-black ${

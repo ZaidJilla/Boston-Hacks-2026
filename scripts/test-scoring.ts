@@ -1,6 +1,6 @@
 /** npm run test:scoring: the exploring-pays points rules. */
 import assert from "node:assert/strict";
-import { RANKS, depthMultiplier, describeBreakdown, distanceMultiplier, hoodRankFor, hoodTitle, pointsForCheckin, rankFor, rankProgress, scoreCheckin } from "../src/lib/scoring";
+import { HOOD_RANKS, MAYOR, RANKS, depthMultiplier, describeBreakdown, distanceMultiplier, hoodRankFor, hoodTitle, hoodTitleFor, pointsForCheckin, rankFor, rankProgress, scoreCheckin } from "../src/lib/scoring";
 
 let passed = 0;
 const test = (name: string, fn: () => void) => {
@@ -54,18 +54,29 @@ test("the total is always the sum of the lines", () => {
 test("a far check-in always beats a home check-in", () => {
   assert.ok(scoreCheckin({ ...base, stopsFromHome: 12 }).total > scoreCheckin({ ...base, stopsFromHome: 0, inHomeNeighborhood: true }).total);
 });
-test("neighborhood ranks: Newcomer at 1, Regular at 3, Local at 6; none at 0", () => {
+test("neighborhood ranks: Wanderer at 1, Neighbor at 3, Insider at 6; none at 0", () => {
   assert.equal(hoodRankFor(0), null);
-  assert.equal(hoodRankFor(1)?.name, "Newcomer");
-  assert.equal(hoodRankFor(2)?.name, "Newcomer");
-  assert.equal(hoodRankFor(3)?.name, "Regular");
-  assert.equal(hoodRankFor(6)?.name, "Local");
+  assert.equal(hoodRankFor(1)?.name, "Wanderer");
+  assert.equal(hoodRankFor(2)?.name, "Wanderer");
+  assert.equal(hoodRankFor(3)?.name, "Neighbor");
+  assert.equal(hoodRankFor(6)?.name, "Insider");
+});
+test("neighborhood titles use their own names, never the overall ones", () => {
+  const overall = new Set<string>(RANKS.map((r) => r.name));
+  for (const r of [...HOOD_RANKS, MAYOR]) assert.ok(!overall.has(r.name), r.name);
 });
 test("Mayor is first place with an unlocked neighborhood; otherwise the spots title", () => {
   assert.equal(hoodTitle(1, 3), "Mayor");
-  assert.equal(hoodTitle(1, 2), "Newcomer");
-  assert.equal(hoodTitle(2, 7), "Local");
+  assert.equal(hoodTitle(1, 2), "Wanderer");
+  assert.equal(hoodTitle(2, 7), "Insider");
   assert.equal(hoodTitle(5, 0), "Visitor");
+  assert.equal(hoodTitleFor(5, 0), null);
+});
+test("neighborhood rank is independent of overall rank: a Visitor can be Mayor, a Legend a Wanderer", () => {
+  assert.equal(rankFor(20).id, "visitor");
+  assert.equal(hoodTitleFor(1, 4)?.id, "mayor");
+  assert.equal(rankFor(5000).id, "legend");
+  assert.equal(hoodTitleFor(9, 1)?.id, "wanderer");
 });
 test("overall rank comes from points: 0 Visitor, 150 Regular, 700 Local, 1500 Legend", () => {
   for (const [pts, id] of [[0, "visitor"], [149, "visitor"], [150, "regular"], [699, "regular"], [700, "local"], [1499, "local"], [1500, "legend"], [99999, "legend"]] as const)
@@ -96,9 +107,9 @@ test("the deeper you are in a neighborhood, the less a visit pays: x1, x0.75, x0
 });
 test("depth falloff shows in the breakdown, and old callers (no spotsInHood) are unchanged", () => {
   const b = scoreCheckin({ ...base, isChain: false, stopsFromHome: 12, spotsInHood: 6 });
-  assert.equal(b.hoodRank, "Local");
+  assert.equal(b.hoodRank, "Insider");
   assert.equal(b.distancePoints, 10); // 10 x 2 x 0.5
-  assert.equal(describeBreakdown(b), "Base 10 × 2 (12 stops from home) × 0.5 (Local here) + Independent 5 = 15");
+  assert.equal(describeBreakdown(b), "Base 10 × 2 (12 stops from home) × 0.5 (Insider here) + Independent 5 = 15");
   assert.equal(pointsForCheckin(base), 10);
 });
 console.log(`\n${passed} passed${process.exitCode ? ", some FAILED" : ""}`);

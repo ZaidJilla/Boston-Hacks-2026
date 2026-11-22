@@ -246,13 +246,18 @@ export function rankFor(points: number): Rank {
 export const rankIndex = (id: RankId): number => RANKS.findIndex((r) => r.id === id);
 
 // ---- Neighborhood ranks ----
-// A title for each neighborhood, from how many of its spots you have eaten at. The player with the most
-// (at least UNLOCK_THRESHOLD, so it has to be a neighborhood they unlocked) is its Mayor.
+// A separate ladder for each neighborhood, from how many of its spots you have eaten at. It has nothing to do
+// with your overall rank (which is points): you can be a Visitor overall and the Mayor of Allston. The names
+// and the look are different on purpose. The player with the most spots (at least UNLOCK_THRESHOLD, so they
+// unlocked it) is the neighborhood's Mayor.
 export const HOOD_RANKS = [
-  { id: "newcomer", name: "Newcomer", minSpots: 1 },
-  { id: "regular", name: "Regular", minSpots: UNLOCK_THRESHOLD },
-  { id: "local", name: "Local", minSpots: 6 },
+  { id: "wanderer", name: "Wanderer", minSpots: 1, blurb: "Just passing through." },
+  { id: "neighbor", name: "Neighbor", minSpots: UNLOCK_THRESHOLD, blurb: "They know your order." },
+  { id: "insider", name: "Insider", minSpots: 6, blurb: "You know every corner." },
 ] as const;
+export type HoodRankId = (typeof HOOD_RANKS)[number]["id"] | "mayor";
+
+export const MAYOR = { id: "mayor", name: "Mayor", blurb: "Nobody has eaten more of this neighborhood." } as const;
 
 /** The title for this many spots in one neighborhood, or null with none. */
 export function hoodRankFor(spots: number): (typeof HOOD_RANKS)[number] | null {
@@ -261,17 +266,22 @@ export function hoodRankFor(spots: number): (typeof HOOD_RANKS)[number] | null {
   return rank;
 }
 
-/** What to call a player on a neighborhood board: Mayor for first place, else their title there. */
+/** A player's title on a neighborhood board: Mayor for first place, else their spots title (null with none). */
+export function hoodTitleFor(place: number, spots: number): { id: HoodRankId; name: string } | null {
+  if (place === 1 && spots >= UNLOCK_THRESHOLD) return MAYOR;
+  return hoodRankFor(spots);
+}
+
+/** The title's name for display ("Visitor" when there is none). */
 export function hoodTitle(place: number, spots: number): string {
-  if (place === 1 && spots >= UNLOCK_THRESHOLD) return "Mayor";
-  return hoodRankFor(spots)?.name ?? "Visitor";
+  return hoodTitleFor(place, spots)?.name ?? "Visitor";
 }
 
 /**
  * The deeper you are in a neighborhood, the less each more visit there pays toward your points, so the
  * fastest way up is to go somewhere new. Keyed by your title in that neighborhood before this visit.
  */
-export const HOOD_DEPTH_MULTIPLIER = { none: 1, newcomer: 1, regular: 0.75, local: 0.5 } as const;
+export const HOOD_DEPTH_MULTIPLIER = { none: 1, wanderer: 1, neighbor: 0.75, insider: 0.5 } as const;
 
 export function depthMultiplier(spotsInHood: number): number {
   const rank = hoodRankFor(spotsInHood);
