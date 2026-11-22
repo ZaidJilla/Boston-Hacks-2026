@@ -69,7 +69,7 @@ src/lib/            Shared logic. Keep game rules in scoring.ts, nothing hardcod
 
 ## Game rules (source of truth: src/lib/scoring.ts)
 
-- Check-in is valid if the user is within **75 m** of the restaurant AND the receipt passes Gemini verification (name matches, dated today).
+- Check-in is valid if the user is within **50 m** of the restaurant **or** scans a receipt that passes Gemini verification (name matches, dated today). One is enough; some people don't get a receipt.
 - One check-in per restaurant per user counts toward unlocks.
 - **3** distinct verified restaurants in a neighborhood = unlocked.
 - Points: 10 per check-in, +50 per neighborhood unlock, +5 if the restaurant is independent (not a chain), +25 per completed line quest.

@@ -1,6 +1,7 @@
 // Source of truth for game rules. No numbers hardcoded elsewhere.
 
-export const CHECKIN_RADIUS_M = 75;
+/** A check-in counts if you are this close, or you scan a receipt from today (not everyone gets one). */
+export const CHECKIN_RADIUS_M = 50;
 export const UNLOCK_THRESHOLD = 3;
 
 export const POINTS = {
