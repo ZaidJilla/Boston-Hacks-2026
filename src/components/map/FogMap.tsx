@@ -176,6 +176,8 @@ function HoodLabels({ unlocked }: { unlocked: Set<string> }) {
 
 // Landmarks are diamonds and shopping is a square, so each type reads at a glance next to the food
 // pins. Same colors as food: amber while the neighborhood is in fog, white once it is clear.
+/** Famous landmarks are drawn a little larger than other places. */
+const FAMOUS_EXTRA = 3;
 const placeIconCache = new Map<string, L.DivIcon>();
 function placeIcon(type: MapPlace["type"], state: "selected" | "clear" | "fog", size: number): L.DivIcon {
   const key = `${type}|${state}|${size}`;
@@ -211,7 +213,7 @@ function PlacePins({
 }) {
   const map = useMap();
   const { zoom, bounds } = useView();
-  const base = zoom <= 13 ? 16 : zoom <= 14 ? 19 : 24;
+  const base = zoom <= 13 ? 11 : zoom <= 14 ? 13 : 16;
 
   // Label a famous place only if its label doesn't land on one already placed, so downtown doesn't
   // become a pile of overlapping names. Shorter names go first because they pack better.
@@ -222,9 +224,9 @@ function PlacePins({
     const famous = places.filter((p) => p.famous && p.id !== selectedId).sort((a, b) => a.name.length - b.name.length);
     for (const p of famous) {
       const pt = map.latLngToContainerPoint([p.lat, p.lng]);
-      const w = p.name.length * 6.8 + 16;
-      const h = 22;
-      const top = pt.y - (base + 6) / 2 - h - 4;
+      const w = p.name.length * 6 + 14;
+      const h = 20;
+      const top = pt.y - (base + FAMOUS_EXTRA) / 2 - h - 3;
       const box = { x1: pt.x - w / 2, x2: pt.x + w / 2, y1: top, y2: top + h };
       if (boxes.some((b) => box.x1 < b.x2 && box.x2 > b.x1 && box.y1 < b.y2 && box.y2 > b.y1)) continue;
       boxes.push(box);
@@ -238,7 +240,7 @@ function PlacePins({
   return (
     <>
       {places.map((p) => {
-        const size = p.famous ? base + 6 : base;
+        const size = p.famous ? base + FAMOUS_EXTRA : base;
         const state = p.id === selectedId ? "selected" : unlocked.has(p.neighborhood) ? "clear" : "fog";
         return (
           <Marker
@@ -272,17 +274,17 @@ function PlacePins({
 }
 
 function pinIcon(state: PinState, selected: boolean): L.DivIcon {
-  const size = selected ? 34 : 26;
+  const size = selected ? 28 : 21;
   const glyph =
     state === "visited"
-      ? `<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+      ? `<svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`
       : state === "fog"
-        ? `<span style="font:900 14px/1 var(--font-inter),sans-serif;color:#000">?</span>`
+        ? `<span style="font:900 12px/1 var(--font-inter),sans-serif;color:#000">?</span>`
         : "";
   const ring = selected ? `box-shadow:0 0 0 3px #fff,0 0 0 6px ${LINE_COLORS.blue};` : "box-shadow:0 2px 4px rgba(0,0,0,.25);";
   return L.divIcon({
     className: "food-pin",
-    html: `<span style="display:flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:999px;border:2.5px solid #000;background:${PIN_FILL[state]};box-sizing:border-box;${ring}">${glyph}</span>`,
+    html: `<span style="display:flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:999px;border:2px solid #000;background:${PIN_FILL[state]};box-sizing:border-box;${ring}">${glyph}</span>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   });
@@ -423,10 +425,20 @@ export default function FogMap({
       className="signage-map h-full w-full"
       style={{ background: FOG }}
     >
+      {/* Esri Light Gray Canvas: a quiet, modern base so the T lines, fog and pins carry the map. The
+          reference layer on top adds street and place labels. No API key needed. */}
       <TileLayer
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · MBTA · City of Boston'
+        url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+        attribution='Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors · MBTA · City of Boston'
+        maxNativeZoom={16}
         maxZoom={19}
+      />
+      <TileLayer
+        url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
+        maxNativeZoom={16}
+        maxZoom={19}
+        pane="overlayPane"
+        zIndex={2}
       />
       <Flyer target={flyTo} />
       <TapCatcher onHood={onSelectNeighborhood} onEmpty={onMapTap} />

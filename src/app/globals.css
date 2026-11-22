@@ -35,7 +35,7 @@ body { background: #FFFFFF; color: #000000; }
 
 /* ---- Map ---- */
 /* Soften the OSM tiles so the T lines, fog and pins carry the map. */
-.signage-map .leaflet-tile-pane { filter: saturate(0.6); }
+/* (tiles are already a quiet light gray; no filter needed) */
 /* Fog fill is blurred so it reads as fog, not flat grey. The blur goes on the pane's <svg>: Leaflet
    panes are 0×0 boxes, and a filter there clips everything away. Outlines and labels sit in their
    own panes and stay crisp. */
@@ -48,11 +48,12 @@ body { background: #FFFFFF; color: #000000; }
 
 /* Permanent labels on famous landmarks: small, readable, no tooltip arrow. */
 .leaflet-tooltip.famous-label {
-  background: #fff;
-  border: 2px solid #000;
-  border-radius: 8px;
-  padding: 1px 6px;
-  font-size: 11px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1.5px solid #000;
+  border-radius: 7px;
+  padding: 0 5px;
+  font-size: 10px;
+  line-height: 17px;
   box-shadow: none;
 }
 .leaflet-tooltip.famous-label::before { display: none; }
