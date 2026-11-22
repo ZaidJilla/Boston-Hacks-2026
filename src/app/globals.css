@@ -106,22 +106,39 @@ body { background: #FFFFFF; color: #000000; }
 .unlock-rings { animation: unlock-rings-in 1s 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
 .unlock-spark { animation: unlock-spark 0.4s var(--d, 0s) backwards, unlock-twinkle 3.2s ease-in-out calc(var(--d, 0s) + 0.5s) infinite; }
 
-/* Between screens: the T line colors sweep off to the right, like a train pulling out. */
-/* Each band is a pill wider than the screen (both rounded ends start off-screen), so it covers
-   everything at first and leaves with a rounded nose and tail. Gentle S-curve (ease-in-out sine):
-   softer start and stop than a cubic, so it glides instead of snapping. */
-@keyframes route-sweep {
-  from { transform: translate3d(0, 0, 0); }
-  to { transform: translate3d(calc(100% + 44px), 0, 0); }
-}
+/* Between screens: four T-line colored bands roll across the screen like a train, you land on the new
+   page, and they roll off the other side. Each band is a pill wider than the screen, so both rounded
+   ends start off-screen; a white line bullet (R, O, G, B) rides at the front like station signage.
+   Ease-in-out sine keeps the start and stop soft. */
+@keyframes route-in { from { transform: translate3d(calc(-100% - 44px), 0, 0); } to { transform: translate3d(0, 0, 0); } }
+@keyframes route-out { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(calc(100% + 44px), 0, 0); } }
 .route-band {
   position: absolute;
   left: -44px;
   right: -44px;
   border-radius: 44px;
-  animation: route-sweep 0.46s cubic-bezier(0.37, 0, 0.63, 1) both;
   will-change: transform;
   backface-visibility: hidden;
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(0.37, 0, 0.63, 1);
+}
+.route-band[data-phase="in"] { animation-name: route-in; animation-duration: 0.28s; }
+.route-band[data-phase="out"] { animation-name: route-out; animation-duration: 0.34s; }
+.route-bullet {
+  position: absolute;
+  right: 64px;
+  top: 50%;
+  display: flex;
+  width: 46px;
+  height: 46px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--c);
+  font: 900 22px/1 var(--font-inter), sans-serif;
+  transform: translateY(-50%);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
 }
 /* The tab you just opened: its icon pops and its line-colored bar grows across. */
 @keyframes nav-pop { 0% { transform: scale(0.7); } 55% { transform: scale(1.3) translateY(-3px); } 100% { transform: none; } }
