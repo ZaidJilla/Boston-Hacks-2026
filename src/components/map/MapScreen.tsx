@@ -26,7 +26,7 @@ import {
   type RestaurantFilters,
 } from "@/lib/geo";
 import LineStripe from "@/components/signage/LineStripe";
-import { ChevronDownIcon, LocateIcon } from "@/components/signage/Icons";
+import { LocateIcon, SlidersIcon } from "@/components/signage/Icons";
 import FogMap, { boundsFor, type FlyTarget } from "./FogMap";
 import FilterSheet, { type FilterSection } from "./FilterSheet";
 import PeekCard from "./PeekCard";
@@ -55,47 +55,6 @@ function locate(): Promise<{ lat: number; lng: number }> {
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 },
     );
   });
-}
-
-/** "$ to $$", "$$", "$, $$$" */
-function priceSummary(prices: number[]): string {
-  const p = [...prices].sort();
-  if (!p.length) return "Price";
-  if (p.length > 1 && p[p.length - 1] - p[0] === p.length - 1) return `${"$".repeat(p[0])} to ${"$".repeat(p[p.length - 1])}`;
-  return p.map((n) => "$".repeat(n)).join(", ");
-}
-
-function cravingSummary(ids: RestaurantFilters["cravings"]): string {
-  if (!ids.length) return "Craving";
-  if (ids.length === 1) return cravingById.get(ids[0])?.label ?? "1 craving";
-  return `${ids.length} cravings`;
-}
-
-function FilterPill({
-  active,
-  onClick,
-  children,
-  label,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-  label: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-label={label}
-      aria-haspopup="dialog"
-      className={`flex h-11 min-w-0 flex-auto items-center justify-center gap-1.5 rounded-full px-3.5 text-[15px] font-extrabold ${
-        active ? "bg-signal text-ink" : "bg-white text-ink"
-      }`}
-    >
-      {children}
-      <ChevronDownIcon size={16} className="shrink-0" />
-    </button>
-  );
 }
 
 export default function MapScreen() {
@@ -221,7 +180,9 @@ export default function MapScreen() {
   const tappedHoodName = hoodInfo ? neighborhoodById.get(hoodInfo)?.properties.name : null;
 
   const unlockedDots = Math.min(4, unlocked.size === 0 ? 0 : Math.max(1, Math.round((unlocked.size / TOTAL_HOODS) * 4)));
-  const lineFilter = filters.lines.length ? LINE_ORDER.filter((l) => filters.lines.includes(l)) : LINE_ORDER.slice(0, 4);
+  // Craving, price, line and local-only. Where you are looking (a neighborhood) is not a filter chip.
+  const filterCount =
+    (filters.cravings.length ? 1 : 0) + (filters.prices.length ? 1 : 0) + (filters.lines.length ? 1 : 0) + (filters.hideChains ? 1 : 0);
 
   return (
     // fills the screen above the app's bottom nav
@@ -252,34 +213,23 @@ export default function MapScreen() {
             </Link>
           </div>
 
-          <div className="flex gap-2">
-            <FilterPill
-              active={filters.cravings.length > 0}
-              onClick={() => setSheet("craving")}
-              label={`Craving filter: ${filters.cravings.length ? cravingSummary(filters.cravings) : "any"}`}
-            >
-              <span className="truncate">{cravingSummary(filters.cravings)}</span>
-            </FilterPill>
-            <FilterPill
-              active={filters.prices.length > 0}
-              onClick={() => setSheet("price")}
-              label={`Price filter: ${filters.prices.length ? priceSummary(filters.prices) : "any"}`}
-            >
-              <span className="truncate">{priceSummary(filters.prices)}</span>
-            </FilterPill>
-            <FilterPill
-              active={filters.lines.length > 0}
-              onClick={() => setSheet("line")}
-              label={`T line filter: ${filters.lines.length ? filters.lines.join(", ") : "any"}`}
-            >
-              <span className="flex shrink-0 -space-x-0.5" aria-hidden="true">
-                {lineFilter.map((l) => (
-                  <span key={l} className="h-2.5 w-2.5 rounded-full ring-1 ring-white" style={{ background: lineColor(l) }} />
-                ))}
+          <button
+            type="button"
+            onClick={() => setSheet("craving")}
+            aria-haspopup="dialog"
+            aria-label={filterCount ? `Filters, ${filterCount} on` : "Filters"}
+            className={`flex h-11 w-full items-center justify-center gap-2 rounded-full text-[16px] font-extrabold text-ink ${
+              filterCount ? "bg-signal" : "bg-white"
+            }`}
+          >
+            <SlidersIcon size={20} />
+            Filters
+            {filterCount > 0 && (
+              <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-ink px-1.5 text-[13px] font-black text-white">
+                {filterCount}
               </span>
-              <span className="truncate">T line</span>
-            </FilterPill>
-          </div>
+            )}
+          </button>
 
           {focused && (
             <div className="flex gap-2 overflow-x-auto" role="group" aria-label="Show on map">
