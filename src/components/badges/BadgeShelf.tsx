@@ -1,37 +1,93 @@
-// The badge shelf on the profile: earned badges in full color, locked ones greyed with how to earn them.
-import { BADGES, earnedIds, type Facts } from "@/lib/badges";
+"use client";
+// The badge shelf on the profile: your three best badges up front, everything else behind "Show all".
+// Every badge is tappable and opens a short card with what it is and how to get it.
+import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { BADGES, RARITY_LABEL, earnedIds, shelfOrder, type Badge, type Facts } from "@/lib/badges";
 import BadgeMedallion from "./BadgeMedallion";
+
+const RARITY_TONE = { common: "bg-panel text-ink", rare: "bg-line-blue text-white", epic: "bg-line-orange text-ink", legendary: "bg-line-red text-white" } as const;
+
+function Tile({ badge, earned, onOpen, delay }: { badge: Badge; earned: boolean; onOpen: () => void; delay: number }) {
+  return (
+    <li className="unlock-rise" style={{ ["--d" as string]: `${delay}s` }}>
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label={`${badge.name}, ${earned ? "earned" : "locked"}. Show details`}
+        className="flex h-full w-full flex-col items-center rounded-card border-2 border-hairline bg-white px-1.5 py-3 text-center active:scale-[0.97] motion-reduce:transition-none"
+      >
+        <BadgeMedallion emoji={badge.emoji} color={badge.color} earned={earned} />
+        <span className={`mt-2 text-[13px] font-extrabold leading-tight ${earned ? "" : "text-muted"}`}>{badge.name}</span>
+        <span className="mt-0.5 text-[11px] font-bold uppercase tracking-[0.5px] text-muted">{earned ? RARITY_LABEL[badge.rarity] : "Locked"}</span>
+      </button>
+    </li>
+  );
+}
+
+function BadgeSheet({ badge, earned, onClose }: { badge: Badge; earned: boolean; onClose: () => void }) {
+  const close = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    close.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+  return createPortal(
+    <div className="fixed inset-0 z-[2000] flex items-end justify-center" role="dialog" aria-modal="true" aria-labelledby="badge-title">
+      <button type="button" aria-label="Close" onClick={onClose} className="fade-in absolute inset-0 cursor-default bg-black/60" tabIndex={-1} />
+      <div className="sheet-up relative w-full max-w-md rounded-t-sheet bg-white px-6 pb-8 pt-6 text-center">
+        <div className="mx-auto flex w-fit justify-center">
+          <BadgeMedallion emoji={badge.emoji} color={badge.color} earned={earned} size={96} />
+        </div>
+        <span className={`eyebrow mt-4 inline-block rounded-full px-3 py-1 ${RARITY_TONE[badge.rarity]}`}>{RARITY_LABEL[badge.rarity]}</span>
+        <h3 id="badge-title" className="mt-2 text-[24px] font-black tracking-[-0.5px]">{badge.name}</h3>
+        <p className="mt-1 text-[16px] text-ink/85">{badge.desc}</p>
+        <p className="mt-3 rounded-card bg-panel px-3 py-2.5 text-[14px] font-bold">
+          {earned ? "You've earned this one." : `How to get it: ${badge.how}`}
+        </p>
+        <button ref={close} type="button" onClick={onClose} className="mt-5 min-h-[48px] w-full rounded-full bg-ink text-[16px] font-extrabold text-white">
+          Close
+        </button>
+      </div>
+    </div>,
+    document.body,
+  );
+}
 
 export default function BadgeShelf({ facts }: { facts: Facts }) {
   const have = earnedIds(facts);
-  // Earned first, in the order they're defined; then the ones still to get.
-  const sorted = [...BADGES].sort((a, b) => Number(have.has(b.id)) - Number(have.has(a.id)));
+  const { featured, rest } = shelfOrder(facts);
+  const [all, setAll] = useState(false);
+  const [open, setOpen] = useState<Badge | null>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   return (
     <section aria-labelledby="badges-h" className="space-y-3">
       <div className="flex items-end justify-between gap-3">
-        <h2 id="badges-h" className="text-[20px] font-black leading-tight tracking-[-0.5px]">
-          Badges
-        </h2>
-        <span className="text-[16px] font-black tabular-nums">
-          {have.size} of {BADGES.length}
-        </span>
+        <h2 id="badges-h" className="text-[20px] font-black leading-tight tracking-[-0.5px]">Badges</h2>
+        <span className="text-[16px] font-black tabular-nums">{have.size} of {BADGES.length}</span>
       </div>
+      <p className="-mt-1.5 text-[14px] text-muted">Your best three. Tap any badge to see what it is.</p>
       <ul className="grid grid-cols-3 gap-2.5">
-        {sorted.map((b, i) => {
-          const earned = have.has(b.id);
-          return (
-            <li
-              key={b.id}
-              className="unlock-rise flex flex-col items-center rounded-card border-2 border-hairline bg-white px-1.5 py-3 text-center"
-              style={{ ["--d" as string]: `${Math.min(i, 12) * 0.03}s` }}
-            >
-              <BadgeMedallion emoji={b.emoji} color={b.color} earned={earned} />
-              <p className={`mt-2 text-[13px] font-extrabold leading-tight ${earned ? "" : "text-muted"}`}>{b.name}</p>
-              <p className="mt-0.5 text-[11px] leading-snug text-muted">{earned ? "Earned" : b.how}</p>
-            </li>
-          );
-        })}
+        {featured.map((b, i) => <Tile key={b.id} badge={b} earned={have.has(b.id)} onOpen={() => setOpen(b)} delay={i * 0.05} />)}
       </ul>
+      {all && (
+        <ul id="badges-rest" className="grid grid-cols-3 gap-2.5">
+          {rest.map((b, i) => <Tile key={b.id} badge={b} earned={have.has(b.id)} onOpen={() => setOpen(b)} delay={Math.min(i, 10) * 0.03} />)}
+        </ul>
+      )}
+      <button
+        type="button"
+        onClick={() => setAll((v) => !v)}
+        aria-expanded={all}
+        aria-controls="badges-rest"
+        className="min-h-[48px] w-full rounded-full border-2 border-ink bg-white text-[16px] font-extrabold"
+      >
+        {all ? "Show fewer" : `Show all ${BADGES.length} badges`}
+      </button>
+      {mounted && open && <BadgeSheet badge={open} earned={have.has(open.id)} onClose={() => setOpen(null)} />}
     </section>
   );
 }

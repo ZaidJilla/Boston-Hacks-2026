@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import LineBullet from "@/components/signage/LineBullet";
 import PageHeader from "@/components/signage/PageHeader";
-import RankBadge from "@/components/rank/RankBadge";
 import BadgeShelf from "@/components/badges/BadgeShelf";
+import RankMedallion from "@/components/rank/RankMedallion";
 import RankLine from "@/components/rank/RankLine";
 import StationDots from "@/components/signage/StationDots";
 import { PersonIcon } from "@/components/signage/Icons";
@@ -142,11 +142,15 @@ export default function ProfilePage() {
         {profile && (
           <>
             <section aria-labelledby="rank-h" className="surface-dark rounded-card bg-ink p-4 text-white">
-              <div className="mb-3 flex items-center justify-between">
-                <h2 id="rank-h" className="eyebrow text-signal">
-                  Your rank
-                </h2>
-                <RankBadge rank={rankProgress(unlocked).rank} />
+              <div className="mb-3 flex items-center gap-4">
+                <RankMedallion rankId={rankProgress(unlocked).rank.id} size={96} />
+                <div className="min-w-0">
+                  <h2 id="rank-h" className="eyebrow text-signal">
+                    Your rank
+                  </h2>
+                  <p className="text-[26px] font-black leading-tight tracking-[-0.5px]">{rankProgress(unlocked).rank.name}</p>
+                  <p className="text-[14px] text-white/80">{rankProgress(unlocked).rank.blurb}</p>
+                </div>
               </div>
               <RankLine unlocked={unlocked} tone="dark" />
             </section>

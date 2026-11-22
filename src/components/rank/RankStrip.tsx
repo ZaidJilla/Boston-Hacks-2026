@@ -4,7 +4,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { rankProgress } from "@/lib/scoring";
-import RankBadge, { RANK_COLORS } from "./RankBadge";
+import { RANK_COLORS } from "./RankBadge";
+import RankMedallion from "./RankMedallion";
 
 export default function RankStrip({ unlocked }: { unlocked: number }) {
   const { rank, next, unlocksToNext } = rankProgress(unlocked);
@@ -26,7 +27,8 @@ export default function RankStrip({ unlocked }: { unlocked: number }) {
       aria-label={`${rank.name}. ${label}. Open your profile`}
       className="flex min-h-[44px] items-center gap-3 rounded-full bg-white/10 px-3 text-white"
     >
-      <RankBadge rank={rank} />
+      <RankMedallion rankId={rank.id} size={36} ribbon={false} />
+      <span className="shrink-0 text-[14px] font-black">{rank.name}</span>
       <span className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-white/25" aria-hidden="true">
         <span
           className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-1000 ease-out motion-reduce:transition-none"
