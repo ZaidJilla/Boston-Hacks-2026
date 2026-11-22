@@ -65,3 +65,50 @@ body { background: #FFFFFF; color: #000000; }
 }
 .rise { transform-origin: bottom; animation: rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 @media (prefers-reduced-motion: reduce) { .rise { animation: none; } }
+
+/* ---- Motion ---------------------------------------------------------------------------------
+   Everything below respects "reduce motion": it all switches off in the media query at the end. */
+
+/* Page change: a quick fade. Opacity only, so fixed-position pages (the map) keep working. */
+@keyframes page-in { from { opacity: 0; } to { opacity: 1; } }
+.page-in { animation: page-in 0.22s ease-out both; }
+
+/* Bottom sheet slides up over a fading backdrop. */
+@keyframes sheet-up { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.sheet-up { animation: sheet-up 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.fade-in { animation: fade-in 0.2s ease-out both; }
+
+/* Neighborhood unlocked: the pin drops and lands, rings radiate from the landing point, the rest
+   rises in behind it. Impact is at 52% of the 1s drop (plus 200ms delay), about 0.72s in. */
+@keyframes unlock-drop {
+  0% { transform: translateY(-280px) scale(1.15); opacity: 0; animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.6); }
+  14% { opacity: 1; }
+  52% { transform: translateY(0) scale(1.1, 0.9); animation-timing-function: ease-out; }
+  68% { transform: translateY(-26px) scale(0.98, 1.02); animation-timing-function: ease-in; }
+  84% { transform: translateY(0) scale(1.03, 0.97); animation-timing-function: ease-out; }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes unlock-ripple {
+  0% { transform: scale(1); opacity: 0.75; }
+  100% { transform: scale(4.4); opacity: 0; }
+}
+@keyframes unlock-pin { 0% { transform: scale(0.5); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
+@keyframes unlock-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes unlock-rings-in { from { opacity: 0; scale: 0.6; } to { opacity: 1; scale: 1; } }
+@keyframes unlock-spark { from { opacity: 0; scale: 0; } to { opacity: 1; scale: 1; } }
+@keyframes unlock-twinkle { 0%, 100% { opacity: 1; translate: 0 0; } 50% { opacity: 0.45; translate: 0 -7px; } }
+
+.unlock-drop { animation: unlock-drop 1s 0.2s both; }
+.unlock-ripple { animation: unlock-ripple 2.7s ease-out infinite backwards; border: 3px solid rgba(255, 255, 255, 0.6); }
+.unlock-pin { animation: unlock-pin 0.45s 0.72s backwards; }
+.unlock-rise { animation: unlock-rise 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--d, 0s); }
+.unlock-rings { animation: unlock-rings-in 1s 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+.unlock-spark { animation: unlock-spark 0.4s var(--d, 0s) backwards, unlock-twinkle 3.2s ease-in-out calc(var(--d, 0s) + 0.5s) infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .page-in, .sheet-up, .fade-in, .unlock-drop, .unlock-ripple, .unlock-pin, .unlock-rise, .unlock-rings, .unlock-spark {
+    animation: none !important;
+  }
+  .unlock-ripple { display: none; }
+}

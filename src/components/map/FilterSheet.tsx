@@ -121,12 +121,12 @@ export default function FilterSheet({
 
   return (
     <>
-      <div className="fixed inset-x-0 bottom-nav top-0 z-[1001] bg-black/40" onClick={onClose} aria-hidden="true" />
+      <div className="fade-in fixed inset-x-0 bottom-nav top-0 z-[1001] bg-black/40" onClick={onClose} aria-hidden="true" />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="filters-h"
-        className="fixed inset-x-0 bottom-nav z-[1002] mx-auto flex max-h-[calc(100dvh-140px)] max-w-md flex-col overflow-hidden rounded-t-sheet bg-white shadow-card"
+        className="sheet-up fixed inset-x-0 bottom-nav z-[1002] mx-auto flex max-h-[calc(100dvh-140px)] max-w-md flex-col overflow-hidden rounded-t-sheet bg-white shadow-card"
       >
         <div className="flex items-center justify-between px-5 pb-2 pt-4">
           <h2 id="filters-h" ref={headingRef} tabIndex={-1} className="text-[22px] font-black tracking-[-0.5px]">
