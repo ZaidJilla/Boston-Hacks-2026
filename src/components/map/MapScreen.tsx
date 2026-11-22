@@ -18,6 +18,10 @@ import FogMap, { boundsFor, type FlyTarget } from "./FogMap";
 import FilterSheet from "./FilterSheet";
 import RestaurantCard from "./RestaurantCard";
 import { useUnlocked } from "./useUnlocked";
+import { useRankUp } from "./useRankUp";
+import RankBadge, { RANK_COLORS } from "@/components/rank/RankBadge";
+import RankUpScreen from "@/components/rank/RankUpScreen";
+import { rankProgress } from "@/lib/scoring";
 
 const TOTAL_HOODS = neighborhoods.features.length;
 
@@ -27,7 +31,9 @@ function distanceFromBoston(lat: number, lng: number) {
 }
 
 export default function MapScreen() {
-  const { unlocked, checkins } = useUnlocked();
+  const { unlocked, checkins, uid, loaded } = useUnlocked();
+  const { rank, next, unlocksToNext } = rankProgress(unlocked.size);
+  const { rankUp, dismiss: dismissRankUp } = useRankUp(uid, unlocked.size, loaded);
 
   const [filters, setFilters] = useState<RestaurantFilters>(DEFAULT_FILTERS);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -113,12 +119,27 @@ export default function MapScreen() {
 
       <header className="pointer-events-none absolute inset-x-0 top-0 z-[1000] flex items-start justify-between gap-2 p-3 pt-[calc(env(safe-area-inset-top)+12px)]">
         <div className="pointer-events-auto rounded-2xl bg-white/95 px-3.5 py-2 shadow-md ring-1 ring-black/10">
-          <p className="text-sm text-ink">
-            <span className="font-bold">{unlocked.size}</span> of {TOTAL_HOODS} neighborhoods unlocked
+          <p className="flex items-center gap-2 text-sm text-ink">
+            <RankBadge rank={rank} />
+            <span>
+              <span className="font-bold">{unlocked.size}</span> of {TOTAL_HOODS} unlocked
+            </span>
           </p>
+          {/* progress toward the next rank, in that rank's color */}
           <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-black/10" aria-hidden>
-            <div className="h-full bg-line-green" style={{ width: `${(unlocked.size / TOTAL_HOODS) * 100}%` }} />
+            <div
+              className="h-full"
+              style={{
+                background: RANK_COLORS[(next ?? rank).id],
+                width: `${
+                  next ? ((unlocked.size - rank.minUnlocks) / (next.minUnlocks - rank.minUnlocks)) * 100 : 100
+                }%`,
+              }}
+            />
           </div>
+          <p className="mt-1 text-[11px] text-ink/60">
+            {next ? `${unlocksToNext} more to ${next.name}` : "Top rank reached"}
+          </p>
         </div>
         {DEMO_MODE && (
           <span className="pointer-events-auto rounded-full bg-line-orange px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm">
@@ -148,6 +169,8 @@ export default function MapScreen() {
           </button>
         </div>
       )}
+
+      {rankUp && <RankUpScreen rank={rankUp} unlocked={unlocked.size} onClose={dismissRankUp} />}
 
       {selected && (
         <RestaurantCard r={selected} unlocked={unlocked.has(selected.neighborhood)} onClose={() => setSelected(null)} />
