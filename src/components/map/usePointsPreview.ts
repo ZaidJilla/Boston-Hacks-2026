@@ -17,6 +17,8 @@ export interface PointsContext {
   visitedHoods: Set<string>;
   /** lines you have visited */
   visitedLines: Set<LineId>;
+  /** spots eaten per neighborhood, for the depth falloff */
+  hoodSpots: Map<string, number>;
 }
 
 export interface Previewable {
@@ -29,6 +31,8 @@ export interface Previewable {
 export interface Preview {
   total: number;
   multiplier: number;
+  /** Falloff for how well you already know this neighborhood (1 = none). */
+  depth: number;
   stopsFromHome: number | null;
   newNeighborhood: boolean;
   newLine: boolean;
@@ -43,8 +47,9 @@ export function previewFor(ctx: PointsContext, r: Previewable): Preview {
   const b = scoreCheckin({
     isChain: r.isChain, unlockedNeighborhood: false, questCompleted: false,
     stopsFromHome, inHomeNeighborhood: inHome, newNeighborhood, newLine,
+    spotsInHood: ctx.hoodSpots.get(r.neighborhood) ?? 0,
   });
-  return { total: b.total, multiplier: distanceMultiplier(stopsFromHome, inHome), stopsFromHome, newNeighborhood, newLine, inHome };
+  return { total: b.total, multiplier: distanceMultiplier(stopsFromHome, inHome), depth: b.depthMultiplier, stopsFromHome, newNeighborhood, newLine, inHome };
 }
 
 export function usePointsContext(): PointsContext | null {
@@ -74,6 +79,7 @@ export function usePointsContext(): PointsContext | null {
           homeHood: home?.neighborhood ?? null,
           visitedHoods: new Set(profile.neighborhoods.filter((n) => n.visited > 0 || n.unlocked).map((n) => n.id)),
           visitedLines: new Set(profile.quests.filter((q) => q.stops > 0).map((q) => q.line)),
+          hoodSpots: new Map(profile.neighborhoods.map((n) => [n.id, n.spots])),
         });
       } catch {
         /* no preview: nothing else depends on it */

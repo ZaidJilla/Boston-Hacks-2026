@@ -25,12 +25,12 @@ function write(uid: string, id: RankId) {
   }
 }
 
-export function useRankUp(uid: string | null, unlockedCount: number, loaded: boolean) {
+export function useRankUp(uid: string | null, points: number, loaded: boolean) {
   const [rankUp, setRankUp] = useState<Rank | null>(null);
 
   useEffect(() => {
     if (!loaded || !uid) return;
-    const now = rankFor(unlockedCount);
+    const now = rankFor(points);
     const seen = read(uid);
     if (seen === null || rankIndex(seen) < 0) {
       write(uid, now.id); // first visit: just remember
@@ -38,7 +38,7 @@ export function useRankUp(uid: string | null, unlockedCount: number, loaded: boo
     }
     if (rankIndex(now.id) > rankIndex(seen)) setRankUp(now);
     write(uid, now.id); // also records rank drops (e.g. a new season), so the next climb shows
-  }, [uid, unlockedCount, loaded]);
+  }, [uid, points, loaded]);
 
   const dismiss = useCallback(() => setRankUp(null), []);
   return { rankUp, dismiss };

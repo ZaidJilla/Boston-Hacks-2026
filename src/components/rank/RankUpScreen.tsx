@@ -12,12 +12,12 @@ const delay = (s: number) => ({ ["--d" as string]: `${s}s` }) as CSSProperties;
 
 export default function RankUpScreen({
   rank,
-  unlocked,
+  points,
   onClose,
 }: {
   rank: Rank;
-  /** Neighborhoods unlocked so far, for the subtitle. */
-  unlocked: number;
+  /** Total points, for the subtitle and the line. */
+  points: number;
   onClose: () => void;
 }) {
   const button = useRef<HTMLButtonElement>(null);
@@ -71,12 +71,12 @@ export default function RankUpScreen({
         {rank.blurb}
       </p>
       <p className="unlock-rise mt-1 text-[14px] text-white/65" style={delay(1.2)}>
-        {unlocked} {unlocked === 1 ? "neighborhood" : "neighborhoods"} unlocked
-        {next ? ` · ${next.minUnlocks - unlocked} more to ${next.name}` : ""}
+        {points} points
+        {next ? ` · ${next.minPoints - points} more to ${next.name}` : ""}
       </p>
 
       <div className="unlock-rise mt-7 w-full max-w-xs" style={delay(1.35)}>
-        <RankLine unlocked={unlocked} tone="dark" />
+        <RankLine points={points} tone="dark" />
       </div>
 
       <button

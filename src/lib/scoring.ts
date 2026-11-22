@@ -63,6 +63,8 @@ export interface PointsInput {
   inHomeNeighborhood?: boolean;
   newNeighborhood?: boolean;
   newLine?: boolean;
+  /** Distinct spots already eaten in this neighborhood before this visit (drives the depth falloff). */
+  spotsInHood?: number;
 }
 
 /** Everything a check-in earned, line by line, so the UI can show its work. */
@@ -71,7 +73,11 @@ export interface PointsBreakdown {
   multiplier: number;
   stopsFromHome: number | null;
   inHomeNeighborhood: boolean;
-  /** base x multiplier, rounded */
+  /** Falloff for how deep you already are in this neighborhood (1 = none). */
+  depthMultiplier: number;
+  /** Your title in this neighborhood before this visit, if any. */
+  hoodRank: string | null;
+  /** base x multiplier x depth, rounded */
   distancePoints: number;
   independent: number;
   newNeighborhood: number;
@@ -85,14 +91,16 @@ export function scoreCheckin(i: PointsInput): PointsBreakdown {
   const stopsFromHome = i.stopsFromHome ?? null;
   const inHomeNeighborhood = Boolean(i.inHomeNeighborhood);
   const multiplier = distanceMultiplier(stopsFromHome, inHomeNeighborhood);
-  const distancePoints = Math.round(POINTS.checkin * multiplier);
+  const spotsInHood = i.spotsInHood ?? 0;
+  const depth = depthMultiplier(spotsInHood);
+  const distancePoints = Math.round(POINTS.checkin * multiplier * depth);
   const independent = i.isChain ? 0 : POINTS.independent;
   const newNeighborhood = i.newNeighborhood ? POINTS.newNeighborhood : 0;
   const newLine = i.newLine ? POINTS.newLine : 0;
   const unlock = i.unlockedNeighborhood ? POINTS.unlock : 0;
   const lineQuest = i.questCompleted ? POINTS.lineQuest : 0;
   return {
-    base: POINTS.checkin, multiplier, stopsFromHome, inHomeNeighborhood, distancePoints,
+    base: POINTS.checkin, multiplier, stopsFromHome, inHomeNeighborhood, depthMultiplier: depth, hoodRank: hoodRankFor(spotsInHood)?.name ?? null, distancePoints,
     independent, newNeighborhood, newLine, unlock, lineQuest,
     total: distancePoints + independent + newNeighborhood + newLine + unlock + lineQuest,
   };
@@ -110,13 +118,14 @@ export function describeBreakdown(b: PointsBreakdown): string {
       : `Base ${b.base} × ${b.multiplier}${
           b.inHomeNeighborhood ? " (home neighborhood)" : b.stopsFromHome !== null ? ` (${b.stopsFromHome} stops from home)` : ""
         }`,
+    b.depthMultiplier !== 1 && `× ${b.depthMultiplier} (${b.hoodRank} here)`,
     b.independent && `Independent ${b.independent}`,
     b.newNeighborhood && `New neighborhood ${b.newNeighborhood}`,
     b.newLine && `New line ${b.newLine}`,
     b.unlock && `Unlock ${b.unlock}`,
     b.lineQuest && `Line quest ${b.lineQuest}`,
   ].filter(Boolean);
-  return `${parts.join(" + ")} = ${b.total}`;
+  return `${parts.join(" + ").replace(" + ×", " ×")} = ${b.total}`;
 }
 
 // ---- Home base ----
@@ -214,34 +223,81 @@ export function isUnlocked(distinctRestaurantsInHood: number): boolean {
 }
 
 // ---------- Ranks ----------
-// Earned by unlocking neighborhoods (exploration, not grinding points). Lowest first.
+// The overall rank comes from total points, so you keep growing even when you go back to places you have
+// been (the neighborhood ranks below are the ones about breadth). Lowest first.
 // Colors and art live in the UI; only the rules live here.
 export const RANKS = [
-  { id: "visitor", name: "Visitor", minUnlocks: 0, blurb: "Fresh off the T. The city is still foggy." },
-  { id: "regular", name: "Regular", minUnlocks: 1, blurb: "You've cleared your first neighborhood." },
-  { id: "local", name: "Local", minUnlocks: 4, blurb: "You know the city past your campus." },
-  { id: "legend", name: "Legend", minUnlocks: 10, blurb: "Most of Boston is yours." },
+  { id: "visitor", name: "Visitor", minPoints: 0, blurb: "Fresh off the T. The city is still foggy." },
+  { id: "regular", name: "Regular", minPoints: 150, blurb: "You're getting around." },
+  { id: "local", name: "Local", minPoints: 700, blurb: "You know the city past your campus." },
+  { id: "legend", name: "Legend", minPoints: 1500, blurb: "Most of Boston is yours." },
 ] as const;
 
 export type Rank = (typeof RANKS)[number];
 export type RankId = Rank["id"];
 
-/** The rank a player holds with this many unlocked neighborhoods. */
-export function rankFor(unlockedNeighborhoods: number): Rank {
+/** The rank a player holds with this many points. */
+export function rankFor(points: number): Rank {
   let rank: Rank = RANKS[0];
-  for (const r of RANKS) if (unlockedNeighborhoods >= r.minUnlocks) rank = r;
+  for (const r of RANKS) if (points >= r.minPoints) rank = r;
   return rank;
 }
 
 export const rankIndex = (id: RankId): number => RANKS.findIndex((r) => r.id === id);
 
-/** Current rank, the next one (if any), and how many more unlocks it takes to get there. */
-export function rankProgress(unlockedNeighborhoods: number): {
+// ---- Neighborhood ranks ----
+// A separate ladder for each neighborhood, from how many of its spots you have eaten at. It has nothing to do
+// with your overall rank (which is points): you can be a Visitor overall and the Mayor of Allston. The names
+// and the look are different on purpose. The player with the most spots (at least UNLOCK_THRESHOLD, so they
+// unlocked it) is the neighborhood's Mayor.
+export const HOOD_RANKS = [
+  { id: "wanderer", name: "Wanderer", minSpots: 1, blurb: "Just passing through." },
+  { id: "neighbor", name: "Neighbor", minSpots: UNLOCK_THRESHOLD, blurb: "They know your order." },
+  { id: "insider", name: "Insider", minSpots: 6, blurb: "You know every corner." },
+] as const;
+export type HoodRankId = (typeof HOOD_RANKS)[number]["id"] | "mayor";
+
+export const MAYOR = { id: "mayor", name: "Mayor", blurb: "Nobody has eaten more of this neighborhood." } as const;
+
+/** The title for this many spots in one neighborhood, or null with none. */
+export function hoodRankFor(spots: number): (typeof HOOD_RANKS)[number] | null {
+  let rank: (typeof HOOD_RANKS)[number] | null = null;
+  for (const r of HOOD_RANKS) if (spots >= r.minSpots) rank = r;
+  return rank;
+}
+
+/** A player's title on a neighborhood board: Mayor for first place, else their spots title (null with none). */
+export function hoodTitleFor(place: number, spots: number): { id: HoodRankId; name: string } | null {
+  if (place === 1 && spots >= UNLOCK_THRESHOLD) return MAYOR;
+  return hoodRankFor(spots);
+}
+
+/** The title's name for display ("Visitor" when there is none). */
+export function hoodTitle(place: number, spots: number): string {
+  return hoodTitleFor(place, spots)?.name ?? "Visitor";
+}
+
+/**
+ * The deeper you are in a neighborhood, the less each more visit there pays toward your points, so the
+ * fastest way up is to go somewhere new. Keyed by your title in that neighborhood before this visit.
+ */
+export const HOOD_DEPTH_MULTIPLIER = { none: 1, wanderer: 1, neighbor: 0.75, insider: 0.5 } as const;
+
+export function depthMultiplier(spotsInHood: number): number {
+  const rank = hoodRankFor(spotsInHood);
+  return rank ? HOOD_DEPTH_MULTIPLIER[rank.id] : 1;
+}
+
+/** Current rank, the next one (if any), and how many more points it takes to get there. */
+export function rankProgress(points: number): {
   rank: Rank;
   next: Rank | null;
-  unlocksToNext: number;
+  pointsToNext: number;
+  /** 0 to 1 of the way from this rank to the next (1 at the top) */
+  fraction: number;
 } {
-  const rank = rankFor(unlockedNeighborhoods);
+  const rank = rankFor(points);
   const next = RANKS[rankIndex(rank.id) + 1] ?? null;
-  return { rank, next, unlocksToNext: next ? next.minUnlocks - unlockedNeighborhoods : 0 };
+  const fraction = next ? Math.min(1, Math.max(0, (points - rank.minPoints) / (next.minPoints - rank.minPoints))) : 1;
+  return { rank, next, pointsToNext: next ? next.minPoints - points : 0, fraction };
 }

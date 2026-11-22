@@ -34,6 +34,7 @@ import { reasonText } from "@/components/restaurant/PointsChip";
 import { useUnlocked } from "./useUnlocked";
 import { previewFor, usePointsContext } from "./usePointsPreview";
 import { useRankUp } from "./useRankUp";
+import HoodBoard from "./HoodBoard";
 import RankStrip from "@/components/rank/RankStrip";
 import RankUpScreen from "@/components/rank/RankUpScreen";
 import { rankProgress } from "@/lib/scoring";
@@ -117,9 +118,9 @@ function FilterPill({
 }
 
 export default function MapScreen() {
-  const { unlocked, checkins, uid, loaded } = useUnlocked();
-  const { rank, next, unlocksToNext } = rankProgress(unlocked.size);
-  const { rankUp, dismiss: dismissRankUp } = useRankUp(uid, unlocked.size, loaded);
+  const { unlocked, checkins, points, uid, loaded } = useUnlocked();
+  const { rank, next, pointsToNext } = rankProgress(points);
+  const { rankUp, dismiss: dismissRankUp } = useRankUp(uid, points, loaded);
 
   const [filters, setFilters] = useState<RestaurantFilters>(DEFAULT_FILTERS);
   const [sheet, setSheet] = useState<FilterSection | null>(null);
@@ -252,6 +253,8 @@ export default function MapScreen() {
 
   const pickHood = pick ? neighborhoodById.get(pick.neighborhood) : null;
   const eaten = pick ? restaurantsIn(pick.neighborhood).filter((r) => checkins.has(r.id)).length : 0;
+  const locHoodId = filters.location.kind === "neighborhood" ? filters.location.id : null;
+  const focusedHood = locHoodId ? { id: locHoodId, name: neighborhoodById.get(locHoodId)?.properties.name ?? locHoodId } : null;
   const tappedHoodName = hoodInfo ? neighborhoodById.get(hoodInfo)?.properties.name : null;
 
   const lineFilter = filters.lines.length ? LINE_ORDER.filter((l) => filters.lines.includes(l)) : LINE_ORDER.slice(0, 4);
@@ -275,7 +278,7 @@ export default function MapScreen() {
             <Link
               href="/profile"
               aria-label={`${rank.name}, ${unlocked.size} of ${TOTAL_HOODS} neighborhoods unlocked${
-                next ? `, ${unlocksToNext} more to ${next.name}` : ""
+                next ? `, ${pointsToNext} points to ${next.name}` : ""
               }`}
               className="flex min-h-[44px] shrink-0 items-center gap-2 rounded-full bg-white px-3 text-[14px] font-extrabold text-ink"
             >
@@ -323,7 +326,7 @@ export default function MapScreen() {
             </div>
           )}
 
-          <RankStrip unlocked={unlocked.size} />
+          <RankStrip points={points} />
         </div>
         <LineStripe />
       </header>
@@ -366,7 +369,8 @@ export default function MapScreen() {
             {locateError}
           </p>
         )}
-        <div className="pointer-events-auto w-full">
+        <div className="pointer-events-auto w-full space-y-3">
+          {focusedHood && !selectedPlace && <HoodBoard hoodId={focusedHood.id} hoodName={focusedHood.name} />}
           {selectedPlace ? (
             <PlaceCard
               p={selectedPlace}
@@ -404,7 +408,7 @@ export default function MapScreen() {
         </div>
       </div>
 
-      {rankUp && <RankUpScreen rank={rankUp} unlocked={unlocked.size} onClose={dismissRankUp} />}
+      {rankUp && <RankUpScreen rank={rankUp} points={points} onClose={dismissRankUp} />}
 
       <FilterSheet
         open={sheet !== null}

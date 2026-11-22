@@ -181,7 +181,9 @@ export interface HomeResult extends HomeState {
 export interface NeighborhoodProgress {
   id: string;
   name: string;
-  visited: number; // distinct restaurants checked into
+  visited: number; // distinct restaurants checked into, capped at needed (for the progress dots)
+  /** The true count, uncapped: your neighborhood rank and the depth falloff use it. */
+  spots: number;
   needed: number; // UNLOCK_THRESHOLD
   unlocked: boolean;
 }

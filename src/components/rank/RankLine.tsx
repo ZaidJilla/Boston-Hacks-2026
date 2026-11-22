@@ -4,14 +4,15 @@
 import { useEffect, useState } from "react";
 import { RANKS, rankProgress } from "@/lib/scoring";
 import { RANK_COLORS } from "./RankBadge";
+import Train from "./Train";
 
 const STATION = 22; // px, station dot
 
-export default function RankLine({ unlocked, tone = "light" }: { unlocked: number; tone?: "light" | "dark" }) {
-  const { rank, next, unlocksToNext } = rankProgress(unlocked);
+export default function RankLine({ points, tone = "light" }: { points: number; tone?: "light" | "dark" }) {
+  const { rank, next, pointsToNext, fraction } = rankProgress(points);
   const idx = RANKS.findIndex((r) => r.id === rank.id);
   // How far you are from this station to the next one, 0 to 1.
-  const frac = next ? Math.min(1, Math.max(0, (unlocked - rank.minUnlocks) / (next.minUnlocks - rank.minUnlocks))) : 0;
+  const frac = next ? fraction : 0;
   const target = (idx + frac) / (RANKS.length - 1); // 0 to 1 along the whole line
 
   // The marker rolls out from the first station when the line appears.
@@ -25,10 +26,10 @@ export default function RankLine({ unlocked, tone = "light" }: { unlocked: numbe
   const dark = tone === "dark";
 
   return (
-    <div role="group" aria-label={`Rank: ${rank.name}. ${next ? `${unlocksToNext} more ${unlocksToNext === 1 ? "unlock" : "unlocks"} to ${next.name}.` : "Top rank."}`}>
-      <div className="relative h-[70px]">
+    <div className="px-3" role="group" aria-label={`Rank: ${rank.name}. ${next ? `${pointsToNext} more points to ${next.name}.` : "Top rank."}`}>
+      <div className="relative h-[84px]">
         {/* the track: grey underneath, colored up to the marker */}
-        <div className="absolute top-[34px] h-[6px] rounded-full" style={{ left: STATION / 2, right: STATION / 2, background: dark ? "#2B3136" : "#B9BEC3" }} />
+        <div className="absolute top-[48px] h-[6px] rounded-full" style={{ left: STATION / 2, right: STATION / 2, background: dark ? "#2B3136" : "#B9BEC3" }} />
         {RANKS.slice(0, -1).map((r, i) => {
           const segStart = i / (RANKS.length - 1);
           const segEnd = (i + 1) / (RANKS.length - 1);
@@ -36,7 +37,7 @@ export default function RankLine({ unlocked, tone = "light" }: { unlocked: numbe
           return (
             <div
               key={r.id}
-              className="absolute top-[34px] h-[6px] rounded-full transition-[width] duration-[1100ms] ease-out motion-reduce:transition-none"
+              className="absolute top-[48px] h-[6px] rounded-full transition-[width] duration-[1400ms] ease-[cubic-bezier(0.45,0,0.2,1)] motion-reduce:transition-none"
               style={{
                 left: at(segStart),
                 width: `calc((100% - ${STATION}px) * ${(segEnd - segStart) * fill})`,
@@ -46,20 +47,31 @@ export default function RankLine({ unlocked, tone = "light" }: { unlocked: numbe
           );
         })}
 
-        {/* YOU marker */}
+        {/* Rail ties under the track */}
         <div
-          className="absolute top-0 -translate-x-1/2 transition-[left] duration-[1100ms] ease-out motion-reduce:transition-none"
+          aria-hidden="true"
+          className="absolute top-[45px] h-[12px]"
+          style={{
+            left: STATION / 2,
+            right: STATION / 2,
+            background: `repeating-linear-gradient(90deg, ${dark ? "rgba(255,255,255,0.22)" : "rgba(0,0,0,0.18)"} 0 2px, transparent 2px 9px)`,
+          }}
+        />
+
+        {/* The train: rides along the track to how far you've come, head first */}
+        <div
+          className="absolute top-[3px] -translate-x-[62%] transition-[left] duration-[1400ms] ease-[cubic-bezier(0.45,0,0.2,1)] motion-reduce:transition-none"
           style={{ left: at(pos) }}
           aria-hidden="true"
         >
           <div className="flex flex-col items-center">
-            <span className="rounded-full bg-signal px-2.5 py-0.5 text-[11px] font-black tracking-wide text-ink">YOU</span>
-            <span className="h-2 w-0.5 bg-signal" />
+            <Train color={RANK_COLORS[rank.id]} width={76} />
+            <span className="-mt-0.5 rounded-full bg-signal px-2 py-px text-[10px] font-black tracking-wide text-ink">YOU</span>
           </div>
         </div>
 
         {/* stations */}
-        <div className="absolute inset-x-0 top-[26px] flex justify-between">
+        <div className="absolute inset-x-0 top-[40px] flex justify-between">
           {RANKS.map((r, i) => {
             const reached = i <= idx;
             return (
@@ -83,7 +95,7 @@ export default function RankLine({ unlocked, tone = "light" }: { unlocked: numbe
         {RANKS.map((r, i) => (
           <li key={r.id} className="w-1/4 first:text-left last:text-right [&:not(:first-child):not(:last-child)]:text-center">
             <p className={`text-[13px] font-extrabold leading-tight ${i === idx ? "" : dark ? "text-white/70" : "text-muted"}`}>{r.name}</p>
-            <p className={`text-[12px] ${dark ? "text-white/60" : "text-muted"}`}>{r.minUnlocks === 0 ? "start" : `${r.minUnlocks} ${r.minUnlocks === 1 ? "unlock" : "unlocks"}`}</p>
+            <p className={`text-[12px] ${dark ? "text-white/60" : "text-muted"}`}>{r.minPoints === 0 ? "start" : `${r.minPoints} pts`}</p>
           </li>
         ))}
       </ol>
@@ -91,7 +103,7 @@ export default function RankLine({ unlocked, tone = "light" }: { unlocked: numbe
       <p className={`mt-3 text-[15px] font-bold ${dark ? "text-white" : ""}`}>
         {next ? (
           <>
-            {unlocksToNext} more {unlocksToNext === 1 ? "unlock" : "unlocks"} to <span style={{ color: dark ? "#FFB81C" : RANK_COLORS[next.id] }}>{next.name}</span>
+            {pointsToNext} more points to <span style={{ color: dark ? "#FFB81C" : RANK_COLORS[next.id] }}>{next.name}</span>
           </>
         ) : (
           "Top of the line. Most of Boston is yours."

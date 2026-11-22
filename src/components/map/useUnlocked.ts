@@ -16,6 +16,7 @@ const DEMO_UNLOCKED = ["fenway", "back-bay", "north-end"];
 /** The slice of the /api/profile response the map uses. */
 interface ProfileSlice {
   uid: string;
+  points: number;
   neighborhoods: { id: string; unlocked: boolean }[];
   visitedRestaurantIds: string[];
 }
@@ -23,6 +24,8 @@ interface ProfileSlice {
 export interface UnlockState {
   unlocked: Set<string>;
   checkins: Set<string>;
+  /** Total points: the overall rank is based on this. */
+  points: number;
   /** Whose progress this is (used to remember the last rank seen). */
   uid: string | null;
   /** False until the first answer (or fallback) is in, so a rank-up isn't judged on empty data. */
@@ -31,7 +34,7 @@ export interface UnlockState {
   source: "profile" | "demo" | "none";
 }
 
-const EMPTY: UnlockState = { unlocked: new Set(), checkins: new Set(), uid: null, loaded: false, source: "none" };
+const EMPTY: UnlockState = { unlocked: new Set(), checkins: new Set(), points: 0, uid: null, loaded: false, source: "none" };
 
 export function useUnlocked(): UnlockState {
   const { user } = useUser();
@@ -56,6 +59,7 @@ export function useUnlocked(): UnlockState {
           next = {
             unlocked: new Set(p.neighborhoods.filter((n) => n.unlocked).map((n) => n.id)),
             checkins: new Set(p.visitedRestaurantIds),
+            points: p.points,
             uid: p.uid,
             loaded: true,
             source: "profile",
@@ -67,6 +71,7 @@ export function useUnlocked(): UnlockState {
       next ??= {
         unlocked: new Set(DEMO_MODE ? DEMO_UNLOCKED : []),
         checkins: new Set(),
+        points: 0,
         uid: user.uid,
         loaded: true,
         source: DEMO_MODE ? "demo" : "none",

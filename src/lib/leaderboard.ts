@@ -122,25 +122,22 @@ export async function byNeighborhood(neighborhood: string, limit = 50): Promise<
   );
 }
 
-/** Adds each player's rank (from how many neighborhoods they have unlocked). Never throws. */
+/** Adds each player's overall rank, from their total points (a neighborhood board's own number is spots, not points). */
 export async function withRanks(rows: LeaderboardRow[]): Promise<LeaderboardRow[]> {
   if (rows.length === 0) return rows;
-  const counts = new Map<string, number>();
+  const totals = new Map<string, number>();
   const pool = getPool();
   if (pool) {
     try {
-      const res = await pool.query<{ uid: string; n: number }>(
-        `SELECT uid, COUNT(*)::int AS n FROM unlocks WHERE uid = ANY($1) GROUP BY uid`,
-        [rows.map((r) => r.id)],
-      );
-      for (const r of res.rows) counts.set(r.uid, r.n);
+      const res = await pool.query<{ uid: string; points: number }>(`SELECT uid, points FROM users WHERE uid = ANY($1)`, [rows.map((r) => r.id)]);
+      for (const r of res.rows) totals.set(r.uid, r.points);
     } catch (err) {
       console.error("leaderboard ranks failed", err); // rows just show without a rank
       return rows;
     }
   } else {
     ensureMemSeeded();
-    for (const r of rows) counts.set(r.id, mem.users.get(r.id)?.unlocked.length ?? 0);
+    for (const r of rows) totals.set(r.id, mem.users.get(r.id)?.points ?? 0);
   }
-  return rows.map((r) => ({ ...r, rank: rankFor(counts.get(r.id) ?? 0).id }));
+  return rows.map((r) => ({ ...r, rank: rankFor(totals.get(r.id) ?? 0).id }));
 }
