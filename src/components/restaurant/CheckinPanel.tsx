@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import Button from "@/components/ui/Button";
 import { DEMO_MODE } from "@/lib/config";
 import { getClientAuth } from "@/lib/firebase";
-import { CHECKIN_RADIUS_M } from "@/lib/scoring";
+import { CHECKIN_RADIUS_M, describeBreakdown } from "@/lib/scoring";
 import type { CheckinResult } from "@/lib/types";
 import UnlockScreen from "./UnlockScreen";
 
@@ -110,12 +110,15 @@ export default function CheckinPanel({
           </p>
         )}
         {result && !result.unlockedNeighborhood && (
-          <div role="status" className="flex items-center justify-between gap-3 rounded-card bg-ink px-4 py-2.5 text-white">
-            <span className="text-[15px] font-bold">
-              Checked in{result.co2SavedKg > 0 && <> · {result.co2SavedKg} kg CO2 saved</>}
-              {result.questCompleted && <> · {result.questCompleted} line quest done</>}
-            </span>
-            <span className="shrink-0 text-[20px] font-black text-signal">+{result.pointsEarned}</span>
+          <div role="status" className="rounded-card bg-ink px-4 py-2.5 text-white">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-[15px] font-bold">
+                Checked in{result.co2SavedKg > 0 && <> · {result.co2SavedKg} kg CO2 saved</>}
+                {result.questCompleted && <> · {result.questCompleted} line quest done</>}
+              </span>
+              <span className="shrink-0 text-[20px] font-black text-signal">+{result.pointsEarned}</span>
+            </div>
+            {result.breakdown && <p className="mt-1 text-[13px] leading-snug text-white/80">{describeBreakdown(result.breakdown)}</p>}
           </div>
         )}
         {result?.unlockedNeighborhood && !showUnlock && (

@@ -63,12 +63,25 @@ export default function UnlockScreen({
   }, [onClose]);
 
   // What this check-in earned, by rule (values from scoring.ts). The total is the server's.
-  const parts = [
-    { value: POINTS.checkin, label: "Check-in" },
-    { value: POINTS.unlock, label: "Unlock" },
-    ...(isChain ? [] : [{ value: POINTS.independent, label: "Independent" }]),
-    ...(result.questCompleted ? [{ value: POINTS.lineQuest, label: "Line quest" }] : []),
-  ];
+  const b = result.breakdown;
+  const parts = b
+    ? [
+        {
+          value: b.distancePoints,
+          label: b.multiplier === 1 ? "Check-in" : b.inHomeNeighborhood ? "Check-in, home" : `Check-in ×${b.multiplier}`,
+        },
+        ...(b.newNeighborhood ? [{ value: b.newNeighborhood, label: "New neighborhood" }] : []),
+        ...(b.unlock ? [{ value: b.unlock, label: "Unlock" }] : []),
+        ...(b.newLine ? [{ value: b.newLine, label: "New line" }] : []),
+        ...(b.independent ? [{ value: b.independent, label: "Independent" }] : []),
+        ...(b.lineQuest ? [{ value: b.lineQuest, label: "Line quest" }] : []),
+      ]
+    : [
+        { value: POINTS.checkin, label: "Check-in" },
+        { value: POINTS.unlock, label: "Unlock" },
+        ...(isChain ? [] : [{ value: POINTS.independent, label: "Independent" }]),
+        ...(result.questCompleted ? [{ value: POINTS.lineQuest, label: "Line quest" }] : []),
+      ];
 
   return (
     <div

@@ -4,11 +4,14 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import LineBullet from "@/components/signage/LineBullet";
 import PageHeader from "@/components/signage/PageHeader";
+import RankBadge from "@/components/rank/RankBadge";
+import RankLine from "@/components/rank/RankLine";
 import StationDots from "@/components/signage/StationDots";
 import { PersonIcon } from "@/components/signage/Icons";
 import Button, { buttonClass } from "@/components/ui/Button";
 import { useUser } from "@/lib/auth";
 import { LINE_COLORS } from "@/lib/config";
+import { rankProgress } from "@/lib/scoring";
 import { stations } from "@/lib/data";
 import type { HomeResult, Profile } from "@/lib/types";
 
@@ -136,6 +139,16 @@ export default function ProfilePage() {
 
         {profile && (
           <>
+            <section aria-labelledby="rank-h" className="surface-dark rounded-card bg-ink p-4 text-white">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 id="rank-h" className="eyebrow text-signal">
+                  Your rank
+                </h2>
+                <RankBadge rank={rankProgress(unlocked).rank} />
+              </div>
+              <RankLine unlocked={unlocked} tone="dark" />
+            </section>
+
             <ul className="grid grid-cols-3 gap-2.5" aria-label="Your totals">
               <Stat label="Points" value={String(profile.points)} tone="dark" />
               <Stat label="Check-ins" value={String(profile.checkins)} />
