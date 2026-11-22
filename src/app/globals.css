@@ -57,3 +57,11 @@ body { background: #FFFFFF; color: #000000; }
   box-shadow: none;
 }
 .leaflet-tooltip.famous-label::before { display: none; }
+
+/* Podium blocks and progress bars grow in when a page opens. */
+@keyframes rise {
+  from { transform: scaleY(0.15); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.rise { transform-origin: bottom; animation: rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@media (prefers-reduced-motion: reduce) { .rise { animation: none; } }
