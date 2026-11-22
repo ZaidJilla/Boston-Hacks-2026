@@ -4,7 +4,7 @@ import PageHeader from "@/components/signage/PageHeader";
 import { TrophyIcon } from "@/components/signage/Icons";
 import { chipClass } from "@/components/ui/Button";
 import { neighborhoods } from "@/lib/geo";
-import { byCollege, byNeighborhood, citywide, collegeStandings } from "@/lib/leaderboard";
+import { byCollege, byNeighborhood, citywide, collegeStandings, withRanks } from "@/lib/leaderboard";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +43,7 @@ export default async function LeaderboardPage({
   } else {
     rows = await citywide();
   }
+  if (!(tab === "college" && !college)) rows = await withRanks(rows);
   const top = rows.slice(0, 3);
   const rest = rows.slice(3);
 

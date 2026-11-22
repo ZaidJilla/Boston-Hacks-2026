@@ -1,6 +1,6 @@
 // Shared contract. Change only after telling the team.
 
-import type { PointsBreakdown } from "./scoring";
+import type { PointsBreakdown, RankId } from "./scoring";
 
 export type LineId = "red" | "orange" | "green" | "blue" | "silver";
 
@@ -160,6 +160,8 @@ export interface LeaderboardRow {
   name: string;
   college?: string;
   points: number;
+  /** The player's rank (from neighborhoods unlocked). Players only, not college standings. */
+  rank?: RankId;
 }
 
 export interface HomeState {
