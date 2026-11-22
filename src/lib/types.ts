@@ -25,6 +25,29 @@ export interface Restaurant {
   nearestStopId: string; // Station.id
 }
 
+/** Landmarks and local stores from data/places.json (restaurants stay in restaurants.json). */
+export interface PlaceRow {
+  id: string;
+  type: "landmark" | "shopping" | "store";
+  /** park, museum, attraction, gallery, historic-building; mall, district, market for shopping */
+  subtype: string;
+  name: string;
+  lat: number;
+  lng: number;
+  neighborhood: string; // Neighborhood.id
+  neighborhoodName: string;
+  isChain: boolean;
+  /** Shown on the map by default to draw people in. */
+  famous?: boolean;
+  /** Added by hand because OSM has no tagged entry for it. */
+  curated?: boolean;
+  address: string | null;
+  website: string | null;
+  openingHours: string | null;
+  wheelchair: string | null; // OSM value: yes | limited | no
+  nearestStopId: string; // Station.id
+}
+
 export interface Station {
   id: string;
   name: string;

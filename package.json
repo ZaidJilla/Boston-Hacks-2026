@@ -11,9 +11,10 @@
     "data:hoods": "tsx scripts/hoods.ts",
     "data:gtfs": "tsx scripts/gtfs.ts",
     "data:food": "tsx scripts/food.ts",
+    "data:places": "tsx scripts/places.ts",
     "data:seed": "tsx scripts/seed.ts",
     "db:migrate": "tsx scripts/migrate.ts",
-    "data:all": "npm run data:hoods && npm run data:gtfs && npm run data:food",
+    "data:all": "npm run data:hoods && npm run data:gtfs && npm run data:food && npm run data:places",
     "data:graph": "tsx scripts/graph.ts"
   },
   "dependencies": {
