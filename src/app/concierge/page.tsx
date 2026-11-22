@@ -5,14 +5,19 @@ import Button from "@/components/ui/Button";
 import Arrivals from "@/components/transit/Arrivals";
 import LineChip from "@/components/transit/LineChip";
 import { getStation } from "@/lib/data";
-import type { ChatTurn, ConciergeReply } from "@/lib/agent";
-import type { Restaurant } from "@/lib/types";
+import type { ChatTurn, ConciergeReply, DetourInfo } from "@/lib/agent";
+import type { PlaceRow, Restaurant } from "@/lib/types";
 
 interface Message extends ChatTurn {
   picks?: Restaurant[];
+  places?: PlaceRow[];
+  detours?: DetourInfo[];
 }
 
 const SUGGESTIONS = [
+  "I'm at Kenmore going to Chinatown, I also want food",
+  "Kenmore to Chinatown, I also want to go shopping",
+  "From Harvard to Fenway, show me a museum or park",
   "Cheap ramen near the Green Line",
   "Independent pizza, under $15",
   "Tacos by the Orange Line",
@@ -42,7 +47,7 @@ export default function ConciergePage() {
       });
       const data = (await res.json()) as Partial<ConciergeReply>;
       if (!res.ok || !data.message) throw new Error(data.message ?? "bad response");
-      setMessages((m) => [...m, { role: "assistant", content: data.message as string, picks: data.picks }]);
+      setMessages((m) => [...m, { role: "assistant", content: data.message as string, picks: data.picks, places: data.places, detours: data.detours }]);
     } catch {
       setMessages((m) => [...m, { role: "assistant", content: "Something went wrong. Try again." }]);
     }
@@ -53,7 +58,7 @@ export default function ConciergePage() {
     <div className="flex min-h-[calc(100vh-3.5rem)] flex-col">
       <header className="p-4 pb-2">
         <h1 className="text-xl font-bold">Concierge</h1>
-        <p className="text-sm text-ink/60">Tell me what you&rsquo;re craving and your budget. I&rsquo;ll find spots near a T stop.</p>
+        <p className="text-sm text-ink/60">Tell me what you&rsquo;re craving, or where you are and where you&rsquo;re going. I&rsquo;ll find spots that barely change your trip.</p>
       </header>
 
       <div className="flex-1 space-y-3 overflow-y-auto px-4 pb-4" aria-live="polite">
@@ -72,7 +77,8 @@ export default function ConciergePage() {
             <p className={m.role === "user" ? "max-w-[85%] rounded-2xl bg-line-blue px-3 py-2 text-sm text-white" : "text-sm"}>
               {m.content}
             </p>
-            {m.picks?.map((r) => <PickCard key={r.id} r={r} />)}
+            {m.places?.map((p) => <PlaceCard key={p.id} p={p} detour={m.detours?.find((d) => d.id === p.id)} />)}
+            {m.picks?.map((r) => <PickCard key={r.id} r={r} detour={m.detours?.find((d) => d.id === r.id)} />)}
           </div>
         ))}
         {busy && <p className="text-sm text-ink/50" aria-busy="true">Looking…</p>}
@@ -95,7 +101,7 @@ export default function ConciergePage() {
   );
 }
 
-function PickCard({ r }: { r: Restaurant }) {
+function PickCard({ r, detour }: { r: Restaurant; detour?: DetourInfo }) {
   const station = getStation(r.nearestStopId);
   return (
     <div className="space-y-2 rounded-lg bg-white p-3">
@@ -110,6 +116,32 @@ function PickCard({ r }: { r: Restaurant }) {
           View
         </Link>
       </div>
+      {detour && <p className="text-xs font-medium text-line-blue">{`+${detour.addedMin} min. ${detour.reason}`}</p>}
+      {station && (
+        <>
+          <div className="flex flex-wrap items-center gap-1.5 text-xs text-ink/70">
+            {station.lines.map((l) => <LineChip key={l} line={l} />)}
+            <span>{station.name}</span>
+          </div>
+          <Arrivals stopId={station.id} limit={2} />
+        </>
+      )}
+    </div>
+  );
+}
+
+function PlaceCard({ p, detour }: { p: PlaceRow; detour?: DetourInfo }) {
+  const station = getStation(p.nearestStopId);
+  const what = p.subtype.replace(/^historic-/, "").replace(/_/g, " ");
+  return (
+    <div className="space-y-2 rounded-lg bg-white p-3">
+      <div>
+        <p className="font-semibold">{p.name}</p>
+        <p className="text-xs capitalize text-ink/60">
+          {p.type} · {what} · {p.neighborhoodName}
+        </p>
+      </div>
+      {detour && <p className="text-xs font-medium text-line-blue">{`+${detour.addedMin} min. ${detour.reason}`}</p>}
       {station && (
         <>
           <div className="flex flex-wrap items-center gap-1.5 text-xs text-ink/70">
