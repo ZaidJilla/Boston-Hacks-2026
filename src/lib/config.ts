@@ -11,6 +11,12 @@ export const LINE_COLORS = {
   silver: "#7C878E",
 } as const;
 
+/**
+ * Outline and name tag of a neighborhood you have unlocked. MBTA Commuter Rail purple: it can't be
+ * mistaken for a subway line, unlike the T green it replaced (that clashed with the Green Line).
+ */
+export const UNLOCKED_COLOR = "#80276C";
+
 export const BOSTON_CENTER: [number, number] = [42.3601, -71.0589];
 export const DEFAULT_ORIGIN = { lat: 42.3398, lng: -71.0892 }; // Northeastern
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { Chip } from "@/components/ui/Button";
-import { APP_NAME, BOSTON_CENTER } from "@/lib/config";
+import { APP_NAME, BOSTON_CENTER, UNLOCKED_COLOR } from "@/lib/config";
 import {
   activeFilterCount,
   cravingById,
@@ -254,7 +254,11 @@ export default function MapScreen() {
             >
               <span className="flex gap-1" aria-hidden="true">
                 {Array.from({ length: 4 }, (_, i) => (
-                  <span key={i} className={`h-2.5 w-2.5 rounded-full ${i < unlockedDots ? "bg-line-green" : "bg-rail"}`} />
+                  <span
+                    key={i}
+                    className={`h-2.5 w-2.5 rounded-full ${i < unlockedDots ? "" : "bg-rail"}`}
+                    style={i < unlockedDots ? { background: UNLOCKED_COLOR } : undefined}
+                  />
                 ))}
               </span>
               {unlocked.size} of {TOTAL_HOODS} unlocked

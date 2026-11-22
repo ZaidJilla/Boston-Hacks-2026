@@ -4,7 +4,7 @@ import L from "leaflet";
 import { useEffect, useMemo, useState } from "react";
 import { CircleMarker, GeoJSON, MapContainer, Marker, Pane, Polyline, TileLayer, Tooltip, useMap } from "react-leaflet";
 import type { PathOptions } from "leaflet";
-import { BOSTON_CENTER, LINE_COLORS } from "@/lib/config";
+import { BOSTON_CENTER, LINE_COLORS, UNLOCKED_COLOR } from "@/lib/config";
 import {
   BOSTON_BOUNDS,
   lines,
@@ -54,7 +54,7 @@ const pinScale = (zoom: number) => (zoom < PIN_MIN_ZOOM ? 0 : Math.min(1, 0.6 + 
 
 const FOG_FILL: PathOptions = { stroke: false, fillColor: FOG, fillOpacity: 0.9 };
 const FOG_EDGE: PathOptions = { fill: false, color: MUTED, weight: 2, opacity: 0.9, dashArray: "6 6" };
-const CLEAR_EDGE: PathOptions = { fill: false, color: LINE_COLORS.green, weight: 5, opacity: 1 };
+const CLEAR_EDGE: PathOptions = { fill: false, color: UNLOCKED_COLOR, weight: 5, opacity: 1 };
 
 const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -165,7 +165,7 @@ function HoodLabels({ unlocked }: { unlocked: Set<string> }) {
           const name = escapeHtml(f.properties.name);
           const clear = unlocked.has(f.properties.id);
           const html = clear
-            ? `<span style="display:inline-block;transform:translate(-50%,-50%);white-space:nowrap;background:${LINE_COLORS.green};color:#fff;border-radius:999px;padding:4px 12px;font:800 13px/1.2 var(--font-inter),sans-serif;letter-spacing:.8px;text-transform:uppercase">${name}</span>`
+            ? `<span style="display:inline-block;transform:translate(-50%,-50%);white-space:nowrap;background:${UNLOCKED_COLOR};color:#fff;border-radius:999px;padding:4px 12px;font:800 13px/1.2 var(--font-inter),sans-serif;letter-spacing:.8px;text-transform:uppercase">${name}</span>`
             : `<span style="display:flex;flex-direction:column;align-items:center;gap:2px;transform:translate(-50%,-50%);white-space:nowrap;color:#2B3136;font:800 ${fontPx}px/1.2 var(--font-inter),sans-serif;letter-spacing:.8px;text-transform:uppercase;text-shadow:0 0 3px #fff,0 0 6px #fff">${name}${lockPx ? `<svg width="${lockPx}" height="${lockPx}" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="#2B3136"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="#2B3136" stroke-width="2.4"/></svg>` : ""}</span>`;
           return [f.properties.id, L.divIcon({ className: "hood-label", html, iconSize: [0, 0], iconAnchor: [0, 0] })];
         }),
