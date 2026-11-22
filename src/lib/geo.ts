@@ -9,6 +9,7 @@ import type {
   Craving,
   Line as LineBase,
   LineId,
+  PlaceRow,
   PriceTier,
   Restaurant as RestaurantBase,
   Station as StationBase,
@@ -19,6 +20,7 @@ import neighborhoodsJson from "../../data/neighborhoods.json";
 import stationsJson from "../../data/stations.json";
 import linesJson from "../../data/lines.json";
 import restaurantsJson from "../../data/restaurants.json";
+import placesJson from "../../data/places.json";
 import cravingsJson from "../../data/cravings.json";
 
 export { UNLOCK_THRESHOLD };
@@ -95,6 +97,19 @@ export const neighborhoods = neighborhoodsJson as unknown as FeatureCollection<
 export const stations = stationsJson as unknown as Station[];
 export const lines = linesJson as unknown as Line[];
 export const restaurants = restaurantsJson as unknown as Restaurant[];
+
+/** Landmarks and shopping centers from data/places.json, with the nearest-station block the map uses. */
+export interface MapPlace extends PlaceRow {
+  nearestStation: { id: string; name: string; lines: LineId[]; distanceM: number; walkMin: number };
+}
+export const mapPlaces = placesJson as unknown as MapPlace[];
+export type MapLayer = "food" | "landmark" | "shopping";
+export const MAP_LAYERS: { id: MapLayer; label: string }[] = [
+  { id: "food", label: "Food" },
+  { id: "landmark", label: "Landmarks" },
+  { id: "shopping", label: "Shopping" },
+];
+export const placesIn = (hoodId: string) => mapPlaces.filter((p) => p.neighborhood === hoodId && p.type !== "store");
 export const cravings = cravingsJson as unknown as CravingInfo[];
 
 export const neighborhoodById = new Map(neighborhoods.features.map((f) => [f.properties.id, f]));
@@ -220,6 +235,16 @@ export function filterRestaurants(list: Restaurant[], f: RestaurantFilters): Res
     if (f.hideChains && r.isChain) return false;
     if (f.location.kind === "neighborhood" && r.neighborhood !== f.location.id) return false;
     if (f.location.kind === "near" && distanceM(r, f.location) > f.location.radiusM) return false;
+    return true;
+  });
+}
+
+/** Craving and price only apply to food. Landmarks and shopping follow the line and location filters. */
+export function filterPlaces(list: MapPlace[], f: RestaurantFilters): MapPlace[] {
+  return list.filter((p) => {
+    if (f.lines.length && !p.nearestStation.lines.some((l) => f.lines.includes(l))) return false;
+    if (f.location.kind === "neighborhood" && p.neighborhood !== f.location.id) return false;
+    if (f.location.kind === "near" && distanceM(p, f.location) > f.location.radiusM) return false;
     return true;
   });
 }

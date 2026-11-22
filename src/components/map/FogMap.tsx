@@ -2,7 +2,7 @@
 
 import L from "leaflet";
 import { useEffect, useMemo, useState } from "react";
-import { CircleMarker, GeoJSON, MapContainer, Pane, Polyline, TileLayer, Tooltip, useMap } from "react-leaflet";
+import { CircleMarker, GeoJSON, MapContainer, Marker, Pane, Polyline, TileLayer, Tooltip, useMap } from "react-leaflet";
 import type { PathOptions } from "leaflet";
 import { BOSTON_CENTER, LINE_COLORS } from "@/lib/config";
 import {
@@ -14,6 +14,7 @@ import {
   neighborhoods,
   stationColor,
   stations,
+  type MapPlace,
   type NeighborhoodFeature,
   type Restaurant,
 } from "@/lib/geo";
@@ -25,6 +26,9 @@ export type FlyTarget =
 
 interface Props {
   restaurants: Restaurant[];
+  places: MapPlace[];
+  selectedPlaceId: string | null;
+  onSelectPlace: (p: MapPlace) => void;
   unlocked: Set<string>;
   selectedId: string | null;
   userPos: { lat: number; lng: number } | null;
@@ -87,6 +91,147 @@ function TapCatcher({ onHood, onEmpty }: { onHood: (id: string) => void; onEmpty
   return null;
 }
 
+// Landmarks are diamonds and shopping is a square, so each type reads at a glance next to the food
+// dots. Same rule as food: solid ink once the neighborhood is unlocked, hollow while it is foggy.
+const iconCache = new Map<string, L.DivIcon>();
+function placeIcon(type: MapPlace["type"], state: "selected" | "open" | "fog", size: number): L.DivIcon {
+  const key = `${type}|${state}|${size}`;
+  const hit = iconCache.get(key);
+  if (hit) return hit;
+  const fill = state === "selected" ? LINE_COLORS.blue : state === "open" ? INK : "#ffffff";
+  const stroke = state === "selected" ? "#ffffff" : INK;
+  const w = state === "selected" ? 2.5 : 1.8;
+  const shape =
+    type === "landmark"
+      ? `<polygon points="10,1.5 18.5,10 10,18.5 1.5,10" fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round"/>`
+      : `<rect x="3" y="3" width="14" height="14" rx="2.5" fill="${fill}" stroke="${stroke}" stroke-width="${w}"/>`;
+  const icon = L.divIcon({
+    className: "",
+    html: `<svg width="${size}" height="${size}" viewBox="0 0 20 20" aria-hidden="true" style="display:block;filter:drop-shadow(0 0 1px rgba(0,0,0,.45))">${shape}</svg>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+  iconCache.set(key, icon);
+  return icon;
+}
+
+function PlaceMarkers({
+  places,
+  unlocked,
+  selectedId,
+  onSelect,
+}: {
+  places: MapPlace[];
+  unlocked: Set<string>;
+  selectedId: string | null;
+  onSelect: (p: MapPlace) => void;
+}) {
+  const zoom = useZoom();
+  const map = useMap();
+  const [moved, setMoved] = useState(0);
+  useEffect(() => {
+    const on = () => setMoved((n) => n + 1);
+    map.on("moveend", on);
+    return () => {
+      map.off("moveend", on);
+    };
+  }, [map]);
+  const base = zoom <= 13 ? 14 : zoom <= 14 ? 17 : 22;
+
+  // Only label a famous place if its label doesn't land on one already placed, so downtown
+  // doesn't turn into a pile of overlapping names. Shorter names go first because they pack better.
+  const labelled = useMemo(() => {
+    const out = new Set<string>();
+    if (zoom < 14) return out;
+    const boxes: { x1: number; y1: number; x2: number; y2: number }[] = [];
+    const famous = places.filter((p) => p.famous && p.id !== selectedId).sort((a, b) => a.name.length - b.name.length);
+    for (const p of famous) {
+      const pt = map.latLngToContainerPoint([p.lat, p.lng]);
+      const w = p.name.length * 6.6 + 16;
+      const h = 22;
+      const top = pt.y - (base + 6) / 2 - h - 4;
+      const box = { x1: pt.x - w / 2, x2: pt.x + w / 2, y1: top, y2: top + h };
+      if (boxes.some((b) => box.x1 < b.x2 && box.x2 > b.x1 && box.y1 < b.y2 && box.y2 > b.y1)) continue;
+      boxes.push(box);
+      out.add(p.id);
+    }
+    return out;
+    // `moved` re-runs this after every pan, since label positions are screen-relative
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [places, zoom, selectedId, map, base, moved]);
+
+  return (
+    <>
+      {places.map((p) => {
+        const size = p.famous ? base + 6 : base;
+        const state = p.id === selectedId ? "selected" : unlocked.has(p.neighborhood) ? "open" : "fog";
+        return (
+          <Marker
+            key={p.id}
+            position={[p.lat, p.lng]}
+            pane="places"
+            icon={placeIcon(p.type, state, size)}
+            keyboard={false}
+            eventHandlers={{
+              click: (e) => {
+                L.DomEvent.stopPropagation(e);
+                onSelect(p);
+              },
+            }}
+          >
+            <Tooltip
+              key={`${p.id}-${labelled.has(p.id)}`}
+              direction="top"
+              offset={[0, -size / 2]}
+              permanent={labelled.has(p.id)}
+              className={p.famous ? "famous-label" : undefined}
+            >
+              <span className="font-semibold">{p.name}</span>
+            </Tooltip>
+          </Marker>
+        );
+      })}
+    </>
+  );
+}
+
+const labelCache = new Map<string, L.DivIcon>();
+function labelIcon(name: string, unlocked: boolean): L.DivIcon {
+  const key = `${name}|${unlocked}`;
+  const hit = labelCache.get(key);
+  if (hit) return hit;
+  const icon = L.divIcon({
+    className: "",
+    html: `<div style="transform:translate(-50%,-50%);white-space:nowrap;font:700 11px/1 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:${unlocked ? "#00602B" : "#2B3137"};text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 2px #fff;pointer-events:none">${name}</div>`,
+    iconSize: [0, 0],
+  });
+  labelCache.set(key, icon);
+  return icon;
+}
+
+/** Neighborhood names, so the map reads as a map of places, not just grey shapes. */
+function NeighborhoodLabels({ unlocked }: { unlocked: Set<string> }) {
+  const zoom = useZoom();
+  if (zoom < 12) return null;
+  return (
+    <>
+      {neighborhoods.features
+        // tiny neighborhoods only get a label once there is room for it
+        .filter((f) => zoom >= 14 || (f.properties.sqmiles ?? 1) >= 0.6)
+        .map((f) => (
+          <Marker
+            key={f.properties.id}
+            position={f.properties.center}
+            pane="labels"
+            icon={labelIcon(f.properties.name, unlocked.has(f.properties.id))}
+            interactive={false}
+            keyboard={false}
+          />
+        ))}
+    </>
+  );
+}
+
 function FoodMarkers({
   restaurants,
   unlocked,
@@ -135,6 +280,9 @@ function FoodMarkers({
 
 export default function FogMap({
   restaurants,
+  places,
+  selectedPlaceId,
+  onSelectPlace,
   unlocked,
   selectedId,
   userPos,
@@ -198,6 +346,10 @@ export default function FogMap({
         />
       </Pane>
 
+      <Pane name="labels" style={{ zIndex: 405, pointerEvents: "none" }}>
+        <NeighborhoodLabels unlocked={unlocked} />
+      </Pane>
+
       <Pane name="lines" style={{ zIndex: 410, pointerEvents: "none" }}>
         {lines.flatMap((l) =>
           l.branches.map((b) => (
@@ -242,6 +394,10 @@ export default function FogMap({
           renderer={renderers.food}
           onSelect={onSelectRestaurant}
         />
+      </Pane>
+
+      <Pane name="places" style={{ zIndex: 435 }}>
+        <PlaceMarkers places={places} unlocked={unlocked} selectedId={selectedPlaceId} onSelect={onSelectPlace} />
       </Pane>
 
       {userPos && (

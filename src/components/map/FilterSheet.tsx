@@ -107,7 +107,7 @@ export default function FilterSheet({
               {resultCount} {resultCount === 1 ? "spot" : "spots"}
             </span>
             <span className="block text-xs text-ink/60">
-              {count ? `${count} filter${count > 1 ? "s" : ""} on` : "What are you craving?"}
+              {count ? `${count} filter${count > 1 ? "s" : ""} on` : "Tap a neighborhood to see what's inside"}
             </span>
           </span>
           <span className="flex min-h-[44px] items-center gap-1.5 rounded-full bg-ink px-4 text-sm font-semibold text-white">
