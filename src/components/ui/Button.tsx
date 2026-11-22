@@ -8,7 +8,7 @@ export const buttonClass = (variant: ButtonVariant = "primary") =>
     variant === "primary"
       ? "bg-line-blue text-white"
       : variant === "dark"
-        ? "surface-dark bg-ink text-white"
+        ? "bg-ink text-white"
         : "border-2 border-ink bg-white text-ink"
   }`;
 
@@ -27,7 +27,7 @@ export const chipClass = (selected = false, accent = false) =>
     selected
       ? accent
         ? "border-signal bg-signal text-ink"
-        : "surface-dark border-ink bg-ink text-white"
+        : "border-ink bg-ink text-white"
       : "border-ink bg-white text-ink"
   }`;
 

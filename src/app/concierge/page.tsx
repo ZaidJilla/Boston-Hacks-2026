@@ -3,13 +3,17 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { chipClass } from "@/components/ui/Button";
 import PageHeader from "@/components/signage/PageHeader";
-import LineBullet, { LINE_NAME, lineTextColor } from "@/components/signage/LineBullet";
+import LineBullet, { LINE_NAME, LINE_ORDER, lineTextColor } from "@/components/signage/LineBullet";
 import RouteStrip from "@/components/signage/RouteStrip";
 import { ArrowUpIcon, ChatIcon } from "@/components/signage/Icons";
 import { useArrivals } from "@/components/signage/useArrivals";
 import { useUnlocked } from "@/components/map/useUnlocked";
 import { LINE_COLORS } from "@/lib/config";
-import { cravings, getRestaurant, LINE_ORDER, restaurantsIn, UNLOCK_THRESHOLD } from "@/lib/geo";
+// lib/data, not lib/geo: geo also bundles the neighborhood polygons, which this page doesn't need.
+import { restaurants as baseRestaurants } from "@/lib/data";
+import { UNLOCK_THRESHOLD } from "@/lib/scoring";
+import type { CravingInfo, Restaurant as FullRestaurant } from "@/lib/geo";
+import cravingsJson from "../../../data/cravings.json";
 import type { ChatTurn, ConciergeReply } from "@/lib/agent";
 import type { Craving, Restaurant, RouteResult } from "@/lib/types";
 
@@ -18,6 +22,11 @@ interface Message extends ChatTurn {
 }
 
 const QUICK_REPLIES = ["Cheaper", "Somewhere new", "Open now"];
+
+// data/restaurants.json carries more fields than the base type; same objects as lib/geo.
+const restaurants = baseRestaurants as FullRestaurant[];
+const byId = new Map(restaurants.map((r) => [r.id, r]));
+const cravings = cravingsJson as CravingInfo[];
 
 export default function ConciergePage() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -163,7 +172,7 @@ export default function ConciergePage() {
 
 /** One suggested spot: line-colored station strip with the next train, then the spot and its trip. */
 function PickCard({ id }: { id: string }) {
-  const r = getRestaurant(id);
+  const r = byId.get(id);
   const { unlocked, checkins } = useUnlocked();
   const st = r?.nearestStation;
   const line = st ? LINE_ORDER.find((l) => st.lines.includes(l)) : undefined;
@@ -189,7 +198,7 @@ function PickCard({ id }: { id: string }) {
   if (!r || !st) return null;
   const color = line ? LINE_COLORS[line] : "#000000";
   const fg = line ? lineTextColor(line) : "#FFFFFF";
-  const eaten = restaurantsIn(r.neighborhood).filter((x) => checkins.has(x.id)).length;
+  const eaten = restaurants.filter((x) => x.neighborhood === r.neighborhood && checkins.has(x.id)).length;
   const left = unlocked.has(r.neighborhood) ? 0 : Math.max(0, UNLOCK_THRESHOLD - eaten);
 
   return (

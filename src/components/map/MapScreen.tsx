@@ -174,22 +174,8 @@ export default function MapScreen() {
 
   return (
     // fills the screen above the app's bottom nav
+    // header first in the DOM so keyboard users reach the filters before the map
     <div className="fixed inset-x-0 bottom-nav top-0 overflow-hidden bg-fog">
-      <FogMap
-        restaurants={visible}
-        unlocked={unlocked}
-        visited={checkins}
-        selectedId={selected?.id ?? null}
-        userPos={userPos}
-        flyTo={flyTo}
-        onSelectRestaurant={(r) => {
-          setSelected(r);
-          setHoodInfo(null);
-        }}
-        onSelectNeighborhood={selectHood}
-        onMapTap={clearSelection}
-      />
-
       <header className="surface-dark absolute inset-x-0 top-0 z-[1000] bg-ink">
         <div className="space-y-3 px-3 pb-3 pt-[calc(env(safe-area-inset-top)+12px)]">
           <div className="flex items-center justify-between gap-3">
@@ -247,6 +233,21 @@ export default function MapScreen() {
         <LineStripe />
       </header>
 
+      <FogMap
+        restaurants={visible}
+        unlocked={unlocked}
+        visited={checkins}
+        selectedId={selected?.id ?? null}
+        userPos={userPos}
+        flyTo={flyTo}
+        onSelectRestaurant={(r) => {
+          setSelected(r);
+          setHoodInfo(null);
+        }}
+        onSelectNeighborhood={selectHood}
+        onMapTap={clearSelection}
+      />
+
       <div className="pointer-events-none absolute inset-x-3 bottom-3 z-[1000] mx-auto flex max-w-md flex-col items-end gap-3">
         <button
           type="button"
@@ -278,7 +279,7 @@ export default function MapScreen() {
               <button
                 type="button"
                 onClick={() => changeFilters(DEFAULT_FILTERS)}
-                className="surface-dark mt-3 min-h-[44px] rounded-full bg-ink px-5 text-[15px] font-extrabold text-white"
+                className="mt-3 min-h-[44px] rounded-full bg-ink px-5 text-[15px] font-extrabold text-white"
               >
                 Clear filters
               </button>

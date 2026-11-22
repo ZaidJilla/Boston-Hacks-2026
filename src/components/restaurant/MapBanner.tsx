@@ -5,22 +5,30 @@ import L from "leaflet";
 import { useMemo } from "react";
 import { CircleMarker, MapContainer, Marker, Polyline, TileLayer } from "react-leaflet";
 import { LINE_COLORS } from "@/lib/config";
-import { lines, LINE_ORDER, type Restaurant } from "@/lib/geo";
-import type { Station } from "@/lib/types";
+import type { LineId, Station } from "@/lib/types";
 import { lineTextColor } from "@/components/signage/LineBullet";
 
 const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
-export default function MapBanner({ r, station }: { r: Restaurant; station: Station | undefined }) {
-  const line = station ? LINE_ORDER.find((l) => station.lines.includes(l)) : undefined;
+export interface BannerProps {
+  lat: number;
+  lng: number;
+  station: Station | undefined;
+  /** the station's main line, for the label color */
+  line: LineId | undefined;
+  /** track shapes of the station's lines, picked on the server so the client skips the line data */
+  shapes: { key: string; color: string; points: [number, number][] }[];
+}
+
+export default function MapBanner({ lat, lng, station, line, shapes }: BannerProps) {
   const color = line ? LINE_COLORS[line] : LINE_COLORS.green;
 
   const bounds = useMemo(() => {
-    const pts: [number, number][] = [[r.lat, r.lng]];
+    const pts: [number, number][] = [[lat, lng]];
     if (station) pts.push([station.lat, station.lng]);
     return L.latLngBounds(pts).pad(0.6);
-  }, [r, station]);
+  }, [lat, lng, station]);
 
   const pin = useMemo(
     () =>
@@ -46,8 +54,6 @@ export default function MapBanner({ r, station }: { r: Restaurant; station: Stat
     [station, color, line],
   );
 
-  const stationLines = station ? lines.filter((l) => station.lines.includes(l.id)) : [];
-
   return (
     <div className="relative h-[190px] w-full overflow-hidden bg-fog">
       <MapContainer
@@ -69,21 +75,19 @@ export default function MapBanner({ r, station }: { r: Restaurant; station: Stat
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           maxZoom={19}
         />
-        {stationLines.flatMap((l) =>
-          l.branches.map((b) => (
-            <Polyline
-              key={`${l.id}-${b.routeId}-${b.terminus}`}
-              positions={b.shape}
-              pathOptions={{ color: l.color, weight: 8, opacity: 1, lineCap: "round", interactive: false }}
-            />
-          )),
-        )}
+        {shapes.map((s) => (
+          <Polyline
+            key={s.key}
+            positions={s.points}
+            pathOptions={{ color: s.color, weight: 8, opacity: 1, lineCap: "round", interactive: false }}
+          />
+        ))}
         {station && (
           <>
             <Polyline
               positions={[
                 [station.lat, station.lng],
-                [r.lat, r.lng],
+                [lat, lng],
               ]}
               pathOptions={{ color: "#000", weight: 3.5, dashArray: "1 8", lineCap: "round", interactive: false }}
             />
@@ -95,7 +99,7 @@ export default function MapBanner({ r, station }: { r: Restaurant; station: Stat
             {label && <Marker position={[station.lat, station.lng]} icon={label} interactive={false} keyboard={false} />}
           </>
         )}
-        <Marker position={[r.lat, r.lng]} icon={pin} interactive={false} keyboard={false} />
+        <Marker position={[lat, lng]} icon={pin} interactive={false} keyboard={false} />
       </MapContainer>
 
       {/* fog creeping in at the corners */}

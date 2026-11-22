@@ -7,8 +7,7 @@ import LineStripe from "@/components/signage/LineStripe";
 import StationDots from "@/components/signage/StationDots";
 import { BadgeIcon, CloseIcon, PinCheckIcon } from "@/components/signage/Icons";
 import { DEMO_MODE } from "@/lib/config";
-import { neighborhoodById, UNLOCK_THRESHOLD } from "@/lib/geo";
-import { POINTS } from "@/lib/scoring";
+import { POINTS, UNLOCK_THRESHOLD } from "@/lib/scoring";
 import type { CheckinResult } from "@/lib/types";
 
 // Decorative sparkles: [left %, top px, size px, amber?]
@@ -19,16 +18,18 @@ const SPARKS: [number, number, number, boolean][] = [
 
 export default function UnlockScreen({
   result,
+  hoodName,
   isChain,
   onClose,
 }: {
   result: CheckinResult;
+  /** display name of result.unlockedNeighborhood */
+  hoodName: string;
   isChain: boolean;
   onClose: () => void;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const hoodId = result.unlockedNeighborhood!;
-  const name = neighborhoodById.get(hoodId)?.properties.name ?? hoodId;
+  const name = hoodName;
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -54,7 +55,7 @@ export default function UnlockScreen({
     >
       <LineStripe height={8} greenAs="#FFFFFF" />
 
-      <div className="relative flex shrink-0 flex-col items-center overflow-hidden px-4 pb-10 pt-6 text-white">
+      <div className="surface-dark relative flex shrink-0 flex-col items-center overflow-hidden px-4 pb-10 pt-6 text-white">
         {/* concentric rings + sparkles */}
         <svg
           className="pointer-events-none absolute left-1/2 top-[150px] -translate-x-1/2 -translate-y-1/2"
@@ -80,7 +81,7 @@ export default function UnlockScreen({
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="surface-dark absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full bg-ink/80 text-white"
+          className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full bg-ink/80 text-white"
         >
           <CloseIcon size={20} />
         </button>

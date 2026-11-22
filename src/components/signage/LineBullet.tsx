@@ -1,6 +1,9 @@
 import { LINE_COLORS } from "@/lib/config";
 import type { LineId } from "@/lib/types";
 
+/** Display order of the lines (same as lib/geo, kept here so client code needn't load geo data). */
+export const LINE_ORDER: LineId[] = ["red", "orange", "green", "blue", "silver"];
+
 export const LINE_LETTER: Record<LineId, string> = { red: "R", orange: "O", green: "G", blue: "B", silver: "SL" };
 export const LINE_NAME: Record<LineId, string> = {
   red: "Red Line",

@@ -6,10 +6,10 @@
 html, body { height: 100%; }
 body { background: #FFFFFF; color: #000000; }
 
-/* Keyboard focus: 3px T-blue ring; white on black surfaces (add .surface-dark to the container). */
+/* Keyboard focus: 3px T-blue ring; white for controls sitting on a dark or colored surface
+   (add .surface-dark to that container, not to the control). */
 :focus-visible { outline: 3px solid #003DA5; outline-offset: 2px; }
-.surface-dark :focus-visible,
-.surface-dark:focus-visible { outline-color: #FFFFFF; }
+.surface-dark :focus-visible { outline-color: #FFFFFF; }
 
 @layer components {
   /* Small caps-style signage label */

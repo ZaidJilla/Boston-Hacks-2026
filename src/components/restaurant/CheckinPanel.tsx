@@ -32,7 +32,19 @@ function getPosition(): Promise<{ lat: number; lng: number }> {
   });
 }
 
-export default function CheckinPanel({ restaurantId, isChain }: { restaurantId: string; isChain: boolean }) {
+const prettyHood = (id: string) => id.split("-").map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(" ");
+
+export default function CheckinPanel({
+  restaurantId,
+  isChain,
+  hoodId,
+  hoodName,
+}: {
+  restaurantId: string;
+  isChain: boolean;
+  hoodId: string;
+  hoodName: string;
+}) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [receipt, setReceipt] = useState<File | null>(null);
   const [result, setResult] = useState<CheckinResult | null>(null);
@@ -167,7 +179,16 @@ export default function CheckinPanel({ restaurantId, isChain }: { restaurantId: 
       {/* Portal: a fixed overlay must not pick up margins or stacking from the page layout. */}
       {result?.unlockedNeighborhood &&
         showUnlock &&
-        createPortal(<UnlockScreen result={result} isChain={isChain} onClose={closeUnlock} />, document.body)}
+        createPortal(
+          <UnlockScreen
+            result={result}
+            // a check-in only unlocks the restaurant's own neighborhood
+            hoodName={result.unlockedNeighborhood === hoodId ? hoodName : prettyHood(result.unlockedNeighborhood)}
+            isChain={isChain}
+            onClose={closeUnlock}
+          />,
+          document.body,
+        )}
     </>
   );
 }
