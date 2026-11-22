@@ -248,7 +248,7 @@ export default function MapScreen() {
       const p = previewFor(pointsCtx, r);
       // The tag is what the visit actually pays: distance bonus times the depth falloff.
       const pays = p.multiplier * p.depth;
-      if (pays > 1) m.set(r.id, pays);
+      if (pays >= 1.5) m.set(r.id, pays); // combined values are only ever 1.5 or 2 here, matching the pin tag
     }
     return m;
   }, [pointsCtx, visible]);

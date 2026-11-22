@@ -42,7 +42,7 @@ export default function RankStrip({ points }: { points: number }) {
         >
           <Train color={RANK_COLORS[rank.id]} width={44} />
         </span>
-        <span className="absolute right-0 top-[15] h-3 w-3 rounded-full border-[3px] border-white bg-black" style={{ top: 15 }} />
+        <span className="absolute right-0 h-3 w-3 rounded-full border-[3px] border-white bg-black" style={{ top: 15 }} />
       </span>
       <span className="shrink-0 text-[13px] font-extrabold">{label}</span>
     </Link>

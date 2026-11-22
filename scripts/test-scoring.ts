@@ -112,4 +112,17 @@ test("depth falloff shows in the breakdown, and old callers (no spotsInHood) are
   assert.equal(describeBreakdown(b), "Base 10 × 2 (12 stops from home) × 0.5 (Insider here) + Independent 5 = 15");
   assert.equal(pointsForCheckin(base), 10);
 });
-console.log(`\n${passed} passed${process.exitCode ? ", some FAILED" : ""}`);
+// The demo player must stay Mayor of Allston: the seed players never go past 3 spots there, the demo has 6.
+(async () => {
+  process.env.NEXT_PUBLIC_DEMO_MODE = "true";
+  const { ensureMemSeeded } = await import("../src/lib/store");
+  const { byNeighborhood } = await import("../src/lib/leaderboard");
+  ensureMemSeeded();
+  const rows = await byNeighborhood("allston");
+  test("the demo player is first in Allston with at least 4 spots, ahead of every seed player", () => {
+    assert.equal(rows[0]?.id, "demo-user");
+    assert.ok(rows[0].points >= 4);
+    assert.ok(rows.length > 1 && rows[0].points > rows[1].points);
+  });
+  console.log(`\n${passed} passed${process.exitCode ? ", some FAILED" : ""}`);
+})();

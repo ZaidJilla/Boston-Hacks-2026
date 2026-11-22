@@ -55,6 +55,7 @@ function Bar({ pct, color = LINE_COLORS.green, label }: { pct: number; color?: s
 export default function ProfilePage() {
   const { user, loading, isDemo, signIn, signOutUser, getIdToken } = useUser();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [homeFailed, setHomeFailed] = useState(false);
   const [home, setHome] = useState<HomeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
@@ -72,6 +73,7 @@ export default function ProfilePage() {
         const data = (await p.json()) as Profile;
         if (alive) setProfile(data);
         if (h.ok && alive) setHome((await h.json()) as HomeResult);
+        else if (alive) setHomeFailed(true); // distance badges need the home station
       } catch {
         if (alive) setError("Couldn't load your profile. Try again in a moment.");
       }
@@ -162,7 +164,17 @@ export default function ProfilePage() {
               <Stat label="kg CO₂ saved" value={String(Math.round(profile.co2SavedKg * 10) / 10)} />
             </ul>
 
-            <BadgeShelf facts={factsFrom(profile, home?.stationId ?? null)} />
+            {homeFailed ? (
+              <section aria-labelledby="badges-h" className="space-y-2">
+                <h2 id="badges-h" className="text-[20px] font-black leading-tight tracking-[-0.5px]">Badges</h2>
+                <p className="text-[14px] text-muted">Couldn&rsquo;t load your badges.</p>
+                <button type="button" onClick={() => window.location.reload()} className={`${buttonClass("outline")} w-full`}>
+                  Try again
+                </button>
+              </section>
+            ) : (
+              <BadgeShelf facts={factsFrom(profile, home?.stationId ?? null)} />
+            )}
 
             <section aria-labelledby="explored-h" className="space-y-3">
               <div className="flex items-end justify-between gap-3">

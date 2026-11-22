@@ -43,7 +43,14 @@ function BadgeSheet({ badge, earned, onClose }: { badge: Badge; earned: boolean;
   dismissRef.current = dismiss;
   useEffect(() => {
     close.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && dismissRef.current();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") dismissRef.current();
+      // Keep keyboard focus inside the dialog: Close is its only control.
+      if (e.key === "Tab") {
+        e.preventDefault();
+        close.current?.focus();
+      }
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);

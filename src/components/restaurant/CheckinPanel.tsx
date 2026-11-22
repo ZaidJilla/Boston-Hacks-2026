@@ -143,6 +143,10 @@ export default function CheckinPanel({
           </p>
         )}
 
+        {result?.ok ? (
+          <p className="text-[14px] font-bold text-line-green">You&rsquo;ve checked in here ✓</p>
+        ) : (
+          <>
         <div className="flex gap-2.5">
           <Button disabled={busy} onClick={() => submit("here")} className="flex-1 whitespace-nowrap !px-2 !text-[15px]">
             {busy ? "Checking in…" : "Check in"}
@@ -160,6 +164,8 @@ export default function CheckinPanel({
           <Button variant="dark" disabled={busy} onClick={() => submit("simulate")} className="w-full !text-[15px]">
             Simulate check-in
           </Button>
+        )}
+          </>
         )}
       </div>
 

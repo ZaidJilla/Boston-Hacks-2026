@@ -86,7 +86,7 @@ export async function byNeighborhood(neighborhood: string, limit = 50): Promise<
                FROM checkins_daily d JOIN users u USING (uid)
               WHERE d.neighborhood = $1
               GROUP BY u.uid, u.display_name, u.college
-              ORDER BY points DESC, MAX(d.day), name LIMIT $2`, // ties: whoever got there first
+              ORDER BY points DESC, MAX(d.day), name LIMIT $2`, // ties: whoever got there first (day-level here: the daily aggregate has no finer time; same-day ties fall back to name)
             [neighborhood, limit],
           )
         ).rows;
