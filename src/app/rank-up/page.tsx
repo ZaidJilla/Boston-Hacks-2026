@@ -9,7 +9,7 @@ function Preview() {
   const router = useRouter();
   const to = useSearchParams().get("to");
   const rank = RANKS.find((r) => r.id === to) ?? RANKS[1];
-  return <RankUpScreen rank={rank} unlocked={rank.minUnlocks} onClose={() => router.push("/")} />;
+  return <RankUpScreen rank={rank} points={rank.minPoints} onClose={() => router.push("/")} />;
 }
 
 export default function RankUpPreviewPage() {

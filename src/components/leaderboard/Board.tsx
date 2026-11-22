@@ -2,8 +2,9 @@
 // Podium and ranked rows for the leaderboard. Client side so the signed-in player's row can stand out.
 import Link from "next/link";
 import { useUser } from "@/lib/auth";
+import HoodMedallion, { HoodTitlePill } from "@/components/rank/HoodMedallion";
 import RankMedallion from "@/components/rank/RankMedallion";
-import { RANKS, hoodTitle } from "@/lib/scoring";
+import { RANKS, hoodTitleFor } from "@/lib/scoring";
 import type { LeaderboardRow } from "@/lib/types";
 
 const rankName = (id: string) => RANKS.find((r) => r.id === id)?.name ?? "";
@@ -32,16 +33,29 @@ export function Podium({ rows, unit, hood = false }: { rows: LeaderboardRow[]; u
                 className="pointer-events-none absolute inset-x-0 inset-y-0 rounded-full opacity-50 blur-xl"
                 style={{ background: glow }}
               />
-              {r.rank && (
-                <span className="relative mx-auto mb-0.5 block w-fit">
-                  <RankMedallion rankId={r.rank} size={34} ribbon={false} />
-                </span>
-              )}
+              {hood
+                ? hoodTitleFor(place, r.points) && (
+                    <span className="relative mx-auto mb-0.5 block w-fit">
+                      <HoodMedallion id={hoodTitleFor(place, r.points)!.id} size={36} />
+                    </span>
+                  )
+                : r.rank && (
+                    <span className="relative mx-auto mb-0.5 block w-fit">
+                      <RankMedallion rankId={r.rank} size={34} ribbon={false} />
+                    </span>
+                  )}
               <p className={`relative truncate text-[15px] font-extrabold ${you ? "text-signal" : "text-white"}`}>
                 {r.name}
                 {you && " (you)"}
               </p>
-              {r.rank && <p className="relative text-[11px] font-black uppercase tracking-[0.6px] text-white/80">{hood ? hoodTitle(place, r.points) : rankName(r.rank)}</p>}
+              {hood ? (
+                <>
+                  <p className="relative text-[11px] font-black uppercase tracking-[0.6px] text-white/90">{hoodTitleFor(place, r.points)?.name}</p>
+                  {r.rank && <p className="relative text-[10px] font-bold text-white/60">{rankName(r.rank)} overall</p>}
+                </>
+              ) : (
+                r.rank && <p className="relative text-[11px] font-black uppercase tracking-[0.6px] text-white/80">{rankName(r.rank)}</p>
+              )}
               <p className="relative text-[13px] tabular-nums text-white/80">
                 <b className="text-[17px] font-black text-white">{r.points}</b> {unit}
               </p>
@@ -87,7 +101,9 @@ export function Rows({
         const inner = (
           <>
             <span className="w-7 shrink-0 text-center text-[18px] font-black tabular-nums text-muted">{startAt + i}</span>
-            {r.rank ? (
+            {hood && hoodTitleFor(startAt + i, r.points) ? (
+              <HoodMedallion id={hoodTitleFor(startAt + i, r.points)!.id} size={40} />
+            ) : r.rank ? (
               <RankMedallion rankId={r.rank} size={40} ribbon={false} />
             ) : (
               <span
@@ -103,8 +119,17 @@ export function Rows({
                 {you && <span className="ml-2 rounded-full bg-ink px-2 py-0.5 align-middle text-[11px] font-black text-signal">YOU</span>}
               </span>
               <span className="flex items-center gap-1.5 text-[14px] text-muted">
-                {r.rank && <span className="shrink-0 rounded-full bg-panel px-2 py-0 text-[11px] font-black uppercase tracking-[0.4px] text-ink">{hood ? hoodTitle(startAt + i, r.points) : rankName(r.rank)}</span>}
-                {r.college && <span className="truncate">{r.college}</span>}
+                {hood ? (
+                  <>
+                    {hoodTitleFor(startAt + i, r.points) && <HoodTitlePill id={hoodTitleFor(startAt + i, r.points)!.id} name={hoodTitleFor(startAt + i, r.points)!.name} />}
+                    {r.rank && <span className="truncate">{rankName(r.rank)} overall</span>}
+                  </>
+                ) : (
+                  <>
+                    {r.rank && <span className="shrink-0 rounded-full bg-panel px-2 py-0 text-[11px] font-black uppercase tracking-[0.4px] text-ink">{rankName(r.rank)}</span>}
+                    {r.college && <span className="truncate">{r.college}</span>}
+                  </>
+                )}
               </span>
             </span>
             <span className="shrink-0 text-right">
