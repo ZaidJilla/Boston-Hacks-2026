@@ -7,7 +7,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { LINE_COLORS } from "@/lib/config";
 
 const BANDS = [LINE_COLORS.red, LINE_COLORS.orange, LINE_COLORS.green, LINE_COLORS.blue];
-const TOTAL_MS = 800; // longest band: 0.4 s sweep + the last stagger, plus the frame wait, with room to spare
+const TOTAL_MS = 850; // longest band: 0.46 s sweep + the last stagger, plus the frame wait, with room to spare
 
 // Layout effects run before the browser paints, so the bands cover the new page from its first frame.
 const useBeforePaint = typeof window !== "undefined" ? useLayoutEffect : useEffect;
@@ -34,7 +34,7 @@ function Sweep() {
             background: color,
             top: `${i * 25}%`,
             height: "25.2%",
-            animationDelay: `${i * 45}ms`,
+            animationDelay: `${i * 55}ms`,
             animationPlayState: go ? "running" : "paused",
           }}
         />
