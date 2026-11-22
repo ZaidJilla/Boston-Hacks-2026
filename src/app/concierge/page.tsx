@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
+import AddToTrip from "@/components/plan/AddToTrip";
 import Arrivals from "@/components/transit/Arrivals";
 import LineChip from "@/components/transit/LineChip";
 import { getStation } from "@/lib/data";
@@ -126,6 +127,7 @@ function PickCard({ r, detour }: { r: Restaurant; detour?: DetourInfo }) {
           <Arrivals stopId={station.id} limit={2} />
         </>
       )}
+      <AddToTrip itemKey={`r:${r.id}`} name={r.name} />
     </div>
   );
 }
@@ -151,6 +153,7 @@ function PlaceCard({ p, detour }: { p: PlaceRow; detour?: DetourInfo }) {
           <Arrivals stopId={station.id} limit={2} />
         </>
       )}
+      <AddToTrip itemKey={`p:${p.id}`} name={p.name} />
     </div>
   );
 }

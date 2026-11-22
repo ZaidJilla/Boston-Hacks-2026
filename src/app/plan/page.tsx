@@ -7,6 +7,7 @@ import PlacePicker, { toUiPlace, type UiPlace } from "@/components/plan/PlacePic
 import TripTimeline from "@/components/plan/TripTimeline";
 import { allItems, itemByKey } from "@/components/plan/searchItems";
 import { DEFAULT_ORIGIN } from "@/lib/config";
+import { readDraft, writeDraft } from "@/lib/tripDraft";
 import type { TripFailure, TripResult } from "@/lib/tripTypes";
 
 const MAX_VIA = 6;
@@ -58,6 +59,7 @@ export default function PlanPage() {
   const [copied, setCopied] = useState(false);
   const resultRef = useRef<HTMLDivElement>(null);
   const [now, setNow] = useState<Date | null>(null);
+  const [hydrated, setHydrated] = useState(false);
 
   // Restore a shared plan (?s=key,key,...&o=1) and set sensible default times in the browser's clock.
   useEffect(() => {
@@ -73,8 +75,18 @@ export default function PlanPage() {
       setVia(places.slice(1, -1));
       setEnd(places[places.length - 1]);
       if (q.get("o") === "1") setOptimize(true);
+    } else {
+      // Stops added from the concierge (or elsewhere) wait here in this browser.
+      const saved = readDraft().map((k) => itemByKey(k)).filter(Boolean).map((i) => toUiPlace(i!));
+      if (saved.length) setVia(saved);
     }
+    setHydrated(true);
   }, []);
+
+  // Keep the shared list in step with what is on this page (only places we can identify by key).
+  useEffect(() => {
+    if (hydrated) writeDraft(via.map((p) => p.key).filter(Boolean) as string[]);
+  }, [via, hydrated]);
 
   const ready = Boolean(start && end);
   const shareKeys = useMemo(() => [start, ...via, end].map((p) => p?.key).filter(Boolean) as string[], [start, via, end]);
