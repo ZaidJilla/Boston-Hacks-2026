@@ -3,7 +3,7 @@
 // /api/directions, drawn as a strip, with the CO2 saved versus a rideshare.
 import { useState } from "react";
 import Button from "@/components/ui/Button";
-import RouteStrip from "@/components/signage/RouteStrip";
+import RouteStrip, { RouteSteps } from "@/components/signage/RouteStrip";
 import { co2SavedKg } from "@/lib/scoring";
 import type { RouteResult } from "@/lib/types";
 
@@ -18,7 +18,7 @@ function getPosition(): Promise<{ lat: number; lng: number } | undefined> {
   });
 }
 
-export default function GetThereCard({ restaurantId }: { restaurantId: string }) {
+export default function GetThereCard({ restaurantId, name }: { restaurantId: string; name: string }) {
   const [route, setRoute] = useState<RouteResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +58,9 @@ export default function GetThereCard({ restaurantId }: { restaurantId: string })
       {route ? (
         <>
           <RouteStrip route={route} />
+          <div className="border-t-2 border-hairline pt-3">
+            <RouteSteps route={route} destination={name} />
+          </div>
           {route.alerts?.map((a, i) => (
             <p key={i} role="status" className="rounded-card bg-signal px-3 py-2 text-[14px] font-semibold text-ink">
               <span className="font-extrabold">Service alert: </span>

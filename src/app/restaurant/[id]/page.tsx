@@ -57,7 +57,7 @@ export default function RestaurantPage({ params }: { params: { id: string } }) {
 
         {station && <ArrivalBoard stopId={station.id} stationName={station.name} />}
 
-        <GetThereCard restaurantId={r.id} />
+        <GetThereCard restaurantId={r.id} name={r.name} />
 
         <Suspense fallback={<DetailsSkeleton />}>
           <RestaurantDetails r={r} />

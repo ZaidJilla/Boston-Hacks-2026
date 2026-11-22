@@ -33,7 +33,7 @@ export default function ArrivalBoard({
         <p className="px-4 py-4 text-[15px] text-white/80">No trains soon.</p>
       ) : (
         <ul className="px-4" aria-live="polite">
-          {arrivals.slice(0, limit).map((a, i) => (
+          {[...arrivals].sort((a, b) => a.minutes - b.minutes).slice(0, limit).map((a, i) => (
             <li key={`${a.line}-${a.headsign}-${i}`} className="flex items-center gap-3 border-b border-boardline py-3 last:border-0">
               <LineBullet line={a.line} size={26} />
               <span className="min-w-0 flex-1 truncate text-[15px] font-bold">{a.headsign || "Inbound"}</span>
