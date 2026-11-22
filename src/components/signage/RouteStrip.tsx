@@ -32,13 +32,15 @@ export default function RouteStrip({ route, compact = false }: { route: RouteRes
 
   return (
     <div className="space-y-1.5">
-      <ol className="sr-only">
-        {route.steps.map((s, i) => (
-          <li key={i}>
-            {s.label}, {s.minutes} min
-          </li>
-        ))}
-      </ol>
+      {!compact && (
+        <ol className="sr-only">
+          {route.steps.map((s, i) => (
+            <li key={i}>
+              {s.label}, {s.minutes} min
+            </li>
+          ))}
+        </ol>
+      )}
       <div className="flex items-center gap-1.5" aria-hidden="true">
         <span className={`${dot} shrink-0 rounded-full border-ink bg-white`} />
         {steps.map((s, i) =>
