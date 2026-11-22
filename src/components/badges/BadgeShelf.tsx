@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { BADGES, RARITY_LABEL, earnedIds, shelfOrder, type Badge, type Facts } from "@/lib/badges";
+import Fold from "@/components/ui/Fold";
 import BadgeMedallion from "./BadgeMedallion";
 
 const RARITY_TONE = { common: "bg-panel text-ink", rare: "bg-line-blue text-white", epic: "bg-line-orange text-ink", legendary: "bg-line-red text-white" } as const;
@@ -86,24 +87,11 @@ export default function BadgeShelf({ facts }: { facts: Facts }) {
       <ul className="grid grid-cols-3 gap-2.5">
         {featured.map((b, i) => <Tile key={b.id} badge={b} earned={have.has(b.id)} onOpen={() => setOpen(b)} delay={i * 0.05} />)}
       </ul>
-      {/* Always rendered so it can grow and shrink smoothly: the row height animates between 0fr and 1fr. */}
-      <div
-        className="grid transition-[grid-template-rows,opacity] duration-[380ms] ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:transition-none"
-        style={{
-          gridTemplateRows: all ? "1fr" : "0fr",
-          opacity: all ? 1 : 0,
-          visibility: all ? "visible" : "hidden",
-          // visibility stays "visible" for the whole transition, then flips, so it leaves the tab order once shut
-          transitionProperty: "grid-template-rows, opacity, visibility",
-        }}
-        aria-hidden={!all}
-      >
-        <div className="overflow-hidden">
-          <ul id="badges-rest" className="grid grid-cols-3 gap-2.5 pb-0.5">
-            {rest.map((b) => <Tile key={b.id} badge={b} earned={have.has(b.id)} onOpen={() => setOpen(b)} delay={0} plain />)}
-          </ul>
-        </div>
-      </div>
+      <Fold open={all} id="badges-rest">
+        <ul className="grid grid-cols-3 gap-2.5 pb-0.5">
+          {rest.map((b) => <Tile key={b.id} badge={b} earned={have.has(b.id)} onOpen={() => setOpen(b)} delay={0} plain />)}
+        </ul>
+      </Fold>
       <button
         type="button"
         onClick={() => setAll((v) => !v)}

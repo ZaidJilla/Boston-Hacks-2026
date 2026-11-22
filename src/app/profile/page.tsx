@@ -9,6 +9,7 @@ import RankMedallion from "@/components/rank/RankMedallion";
 import RankLine from "@/components/rank/RankLine";
 import StationDots from "@/components/signage/StationDots";
 import { PersonIcon } from "@/components/signage/Icons";
+import Fold from "@/components/ui/Fold";
 import Button, { buttonClass } from "@/components/ui/Button";
 import { useUser } from "@/lib/auth";
 import { LINE_COLORS } from "@/lib/config";
@@ -113,7 +114,6 @@ export default function ProfilePage() {
 
   const unlocked = profile?.neighborhoods.filter((n) => n.unlocked).length ?? 0;
   const total = profile?.neighborhoods.length ?? 25;
-  const visibleHoods = profile ? (showAll ? profile.neighborhoods : profile.neighborhoods.slice(0, SHOW_FIRST)) : [];
   const homeStation = stationName(home?.stationId ?? null);
   const homeName = profile?.neighborhoods.find((n) => n.id === home?.neighborhood)?.name;
 
@@ -173,7 +173,7 @@ export default function ProfilePage() {
               <Bar pct={(unlocked / total) * 100} label={`${unlocked} of ${total} neighborhoods unlocked`} />
 
               <ul className="space-y-2.5">
-                {visibleHoods.map((n) => (
+                {(profile?.neighborhoods ?? []).slice(0, SHOW_FIRST).map((n) => (
                   <li key={n.id} className="rounded-card border-2 border-hairline bg-white px-3 py-2.5">
                     <div className="mb-2 flex items-center justify-between gap-3">
                       <span className="truncate text-[16px] font-extrabold">{n.name}</span>
@@ -189,11 +189,31 @@ export default function ProfilePage() {
                   </li>
                 ))}
               </ul>
+              <Fold open={showAll} id="hoods-rest">
+                <ul className="space-y-2.5 pt-2.5">
+                  {(profile?.neighborhoods ?? []).slice(SHOW_FIRST).map((n) => (
+                    <li key={n.id} className="rounded-card border-2 border-hairline bg-white px-3 py-2.5">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <span className="truncate text-[16px] font-extrabold">{n.name}</span>
+                      <span
+                        className={`shrink-0 rounded-full px-2.5 py-0.5 text-[12px] font-black ${
+                          n.unlocked ? "bg-line-green text-white" : "bg-panel text-muted"
+                        }`}
+                      >
+                        {n.unlocked ? "Unlocked" : `${n.visited} of ${n.needed}`}
+                      </span>
+                    </div>
+                    <StationDots total={n.needed} done={n.unlocked ? n.needed : n.visited} label={`${n.name}: ${n.visited} of ${n.needed} eaten`} />
+                  </li>
+                  ))}
+                </ul>
+              </Fold>
               {profile.neighborhoods.length > SHOW_FIRST && (
                 <button
                   type="button"
                   onClick={() => setShowAll((v) => !v)}
                   aria-expanded={showAll}
+                  aria-controls="hoods-rest"
                   className={`${buttonClass("outline")} w-full`}
                 >
                   {showAll ? "Show fewer" : `Show all ${profile.neighborhoods.length}`}
