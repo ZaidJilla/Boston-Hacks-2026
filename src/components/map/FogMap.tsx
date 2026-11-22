@@ -153,8 +153,11 @@ function Stations({ renderer }: { renderer: L.Renderer }) {
 
 function HoodLabels({ unlocked }: { unlocked: Set<string> }) {
   const { zoom } = useView();
-  // The padlock under a foggy neighborhood's name scales with zoom too (none until zoom 13).
-  const lockPx = Math.round(16 * pinScale(zoom));
+  // A foggy neighborhood's name and padlock scale with zoom like the pins: gone when zoomed far out
+  // (below zoom 13), then growing. Unlocked names (the green pills) always show.
+  const scale = pinScale(zoom);
+  const lockPx = Math.round(16 * scale);
+  const fontPx = Math.max(10, Math.round(14 * scale));
   const icons = useMemo(
     () =>
       new Map(
@@ -163,11 +166,11 @@ function HoodLabels({ unlocked }: { unlocked: Set<string> }) {
           const clear = unlocked.has(f.properties.id);
           const html = clear
             ? `<span style="display:inline-block;transform:translate(-50%,-50%);white-space:nowrap;background:${LINE_COLORS.green};color:#fff;border-radius:999px;padding:4px 12px;font:800 13px/1.2 var(--font-inter),sans-serif;letter-spacing:.8px;text-transform:uppercase">${name}</span>`
-            : `<span style="display:flex;flex-direction:column;align-items:center;gap:2px;transform:translate(-50%,-50%);white-space:nowrap;color:#2B3136;font:800 12px/1.2 var(--font-inter),sans-serif;letter-spacing:.8px;text-transform:uppercase;text-shadow:0 0 3px #fff,0 0 6px #fff">${name}${lockPx ? `<svg width="${lockPx}" height="${lockPx}" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="#2B3136"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="#2B3136" stroke-width="2.4"/></svg>` : ""}</span>`;
+            : `<span style="display:flex;flex-direction:column;align-items:center;gap:2px;transform:translate(-50%,-50%);white-space:nowrap;color:#2B3136;font:800 ${fontPx}px/1.2 var(--font-inter),sans-serif;letter-spacing:.8px;text-transform:uppercase;text-shadow:0 0 3px #fff,0 0 6px #fff">${name}${lockPx ? `<svg width="${lockPx}" height="${lockPx}" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="#2B3136"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="#2B3136" stroke-width="2.4"/></svg>` : ""}</span>`;
           return [f.properties.id, L.divIcon({ className: "hood-label", html, iconSize: [0, 0], iconAnchor: [0, 0] })];
         }),
       ),
-    [unlocked, lockPx],
+    [unlocked, lockPx, fontPx],
   );
   if (zoom < 12) return null;
   return (
@@ -175,7 +178,9 @@ function HoodLabels({ unlocked }: { unlocked: Set<string> }) {
       {neighborhoods.features
         // Tiny neighborhoods (Leather District, Bay Village, Chinatown...) pile their names on top of
         // each other when zoomed out, so they get a label once there is room. Unlocked ones always do.
-        .filter((f) => zoom >= 14 || unlocked.has(f.properties.id) || (f.properties.sqmiles ?? 1) >= 0.6)
+        .filter(
+          (f) => unlocked.has(f.properties.id) || (scale > 0 && (zoom >= 14 || (f.properties.sqmiles ?? 1) >= 0.6)),
+        )
         .map((f) => (
           <Marker
             key={f.properties.id}
