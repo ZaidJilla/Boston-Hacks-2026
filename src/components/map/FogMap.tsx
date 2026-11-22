@@ -71,7 +71,7 @@ function Flyer({ target }: { target: FlyTarget }) {
   useEffect(() => {
     if (!target) return;
     // leave room for the top bar and the peek card
-    const pad = { paddingTopLeft: [24, 150] as [number, number], paddingBottomRight: [24, 230] as [number, number] };
+    const pad = { paddingTopLeft: [24, 200] as [number, number], paddingBottomRight: [24, 230] as [number, number] };
     if (target.kind === "bounds") map.flyToBounds(target.bounds, { ...pad, duration: 0.8 });
     else map.flyTo([target.lat, target.lng], target.zoom, { duration: 0.8 });
   }, [map, target]);

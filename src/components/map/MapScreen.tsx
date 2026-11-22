@@ -34,7 +34,7 @@ import { reasonText } from "@/components/restaurant/PointsChip";
 import { useUnlocked } from "./useUnlocked";
 import { previewFor, usePointsContext } from "./usePointsPreview";
 import { useRankUp } from "./useRankUp";
-import RankBadge from "@/components/rank/RankBadge";
+import RankStrip from "@/components/rank/RankStrip";
 import RankUpScreen from "@/components/rank/RankUpScreen";
 import { rankProgress } from "@/lib/scoring";
 
@@ -279,7 +279,6 @@ export default function MapScreen() {
               }`}
               className="flex min-h-[44px] shrink-0 items-center gap-2 rounded-full bg-white px-3 text-[14px] font-extrabold text-ink"
             >
-              <RankBadge rank={rank} />
               <span aria-hidden="true">
                 {unlocked.size} of {TOTAL_HOODS}
               </span>
@@ -323,6 +322,8 @@ export default function MapScreen() {
               </Chip>
             </div>
           )}
+
+          <RankStrip unlocked={unlocked.size} />
         </div>
         <LineStripe />
       </header>
