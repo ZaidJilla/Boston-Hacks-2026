@@ -2,15 +2,34 @@
 // Swipeable photo strip. Photos that fail to load are dropped; with none left, shows the placeholder.
 import { useState } from "react";
 import type { PlacePhoto } from "@/lib/places";
+import FoodArt, { FOOD_BG } from "./FoodArt";
 
-export function PhotoPlaceholder({ emoji, label }: { emoji?: string; label: string }) {
+/** No photo yet: an illustration of the kind of food the place serves, with its category. */
+export function PhotoPlaceholder({
+  name,
+  category,
+  categoryLabel,
+}: {
+  name: string;
+  /** e.g. "chinese", "pizza" (restaurant.category) */
+  category: string;
+  /** e.g. "Chinese", "Pizza" (restaurant.categoryLabel) */
+  categoryLabel: string;
+}) {
   return (
     <div
-      className="flex aspect-[16/9] w-full items-center justify-center rounded-card bg-panel text-6xl"
+      className="relative flex aspect-[16/9] w-full items-center justify-center overflow-hidden rounded-card"
+      style={{ background: FOOD_BG[category] ?? FOOD_BG.other }}
       role="img"
-      aria-label={label}
+      aria-label={`${categoryLabel} illustration. No photo of ${name} yet.`}
     >
-      <span aria-hidden="true">{emoji ?? "🍽️"}</span>
+      <FoodArt category={category} className="h-[78%] w-auto drop-shadow-[0_6px_0_rgba(0,0,0,0.08)]" />
+      <span className="absolute bottom-3 left-3 rounded-full bg-ink px-3 py-1 text-[13px] font-extrabold text-white" aria-hidden="true">
+        {categoryLabel}
+      </span>
+      <span className="absolute bottom-3 right-3 text-[12px] font-bold text-muted" aria-hidden="true">
+        No photo yet
+      </span>
     </div>
   );
 }
@@ -18,13 +37,15 @@ export function PhotoPlaceholder({ emoji, label }: { emoji?: string; label: stri
 export default function PhotoGallery({
   photos,
   name,
-  emoji,
+  category,
+  categoryLabel,
   source,
   sourceUrl,
 }: {
   photos: PlacePhoto[];
   name: string;
-  emoji?: string;
+  category: string;
+  categoryLabel: string;
   source: "google" | "website" | "yelp" | "none";
   /** the business page on the photo source; Yelp photos must link back to it */
   sourceUrl?: string;
@@ -33,7 +54,8 @@ export default function PhotoGallery({
   const shown = photos.filter((p) => !broken.has(p.url));
   const [index, setIndex] = useState(0);
 
-  if (!shown.length) return <PhotoPlaceholder emoji={emoji} label={`No photos of ${name} yet`} />;
+  // Every photo failed to load (dead link, hotlink block): fall back to the illustration.
+  if (!shown.length) return <PhotoPlaceholder name={name} category={category} categoryLabel={categoryLabel} />;
 
   const many = shown.length > 1;
   const current = Math.min(index, shown.length - 1);

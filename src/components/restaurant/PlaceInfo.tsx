@@ -1,6 +1,6 @@
 // Server components for the restaurant detail page. They stream in after the rest of the page
 // (wrap them in <Suspense>) because the photo and details lookup can take a few seconds.
-import { cravingById, type Restaurant } from "@/lib/geo";
+import type { Restaurant } from "@/lib/geo";
 import { formatOsmHours } from "@/lib/hours";
 import { getPlaceDetails } from "@/lib/places";
 import PhotoGallery, { PhotoPlaceholder } from "./PhotoGallery";
@@ -11,9 +11,17 @@ export function PhotosSkeleton() {
 
 export async function RestaurantPhotos({ r }: { r: Restaurant }) {
   const d = await getPlaceDetails(r);
-  const emoji = cravingById.get(r.craving)?.emoji;
-  if (!d.photos.length) return <PhotoPlaceholder emoji={emoji} label={`No photos of ${r.name} yet`} />;
-  return <PhotoGallery photos={d.photos} name={r.name} emoji={emoji} source={d.source} sourceUrl={d.sourceUrl} />;
+  if (!d.photos.length) return <PhotoPlaceholder name={r.name} category={r.category} categoryLabel={r.categoryLabel} />;
+  return (
+    <PhotoGallery
+      photos={d.photos}
+      name={r.name}
+      category={r.category}
+      categoryLabel={r.categoryLabel}
+      source={d.source}
+      sourceUrl={d.sourceUrl}
+    />
+  );
 }
 
 /** Google Maps search link for the place. Works without an API key. */
