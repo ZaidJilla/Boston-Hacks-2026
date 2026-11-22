@@ -7,9 +7,8 @@ import { rankProgress } from "@/lib/scoring";
 import { RANK_COLORS } from "./RankBadge";
 import RankMedallion from "./RankMedallion";
 
-export default function RankStrip({ unlocked }: { unlocked: number }) {
-  const { rank, next, unlocksToNext } = rankProgress(unlocked);
-  const pct = next ? Math.min(1, Math.max(0, (unlocked - rank.minUnlocks) / (next.minUnlocks - rank.minUnlocks))) : 1;
+export default function RankStrip({ points }: { points: number }) {
+  const { rank, next, pointsToNext, fraction: pct } = rankProgress(points);
 
   // The bar fills from empty when the map opens.
   const [shown, setShown] = useState(0);
@@ -19,7 +18,7 @@ export default function RankStrip({ unlocked }: { unlocked: number }) {
   }, [pct]);
 
   const label = next
-    ? `${unlocksToNext} more ${unlocksToNext === 1 ? "unlock" : "unlocks"} to ${next.name}`
+    ? `${pointsToNext} pts to ${next.name}`
     : "Top rank";
   return (
     <Link

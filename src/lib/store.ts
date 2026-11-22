@@ -191,6 +191,10 @@ function memRecord({ user, restaurant: r, lines, lat, lng, co2SavedKg, distance,
 
   // First visit anywhere in this neighborhood? (Checked before this check-in is added.)
   const newNeighborhood = !mem.checkins.some((c) => c.uid === user.uid && c.neighborhood === r.neighborhood);
+  // Spots already eaten in this neighborhood, before this one: the deeper you are, the less a visit pays.
+  const spotsInHood = new Set(
+    mem.checkins.filter((c) => c.uid === user.uid && c.neighborhood === r.neighborhood).map((c) => c.restaurantId),
+  ).size;
 
   const checkinId = String(mem.nextId++);
   mem.checkins.push({
@@ -235,6 +239,7 @@ function memRecord({ user, restaurant: r, lines, lat, lng, co2SavedKg, distance,
     inHomeNeighborhood: distance?.inHomeNeighborhood ?? false,
     newNeighborhood,
     newLine,
+    spotsInHood,
   });
   const pointsEarned = breakdown.total;
   u.points += pointsEarned;
@@ -370,6 +375,7 @@ const pgStore: GameStore = {
         inHomeNeighborhood: distance?.inHomeNeighborhood ?? false,
         newNeighborhood,
         newLine,
+        spotsInHood: count.rows[0].n - 1, // this check-in is already counted
       });
       const pointsEarned = breakdown.total;
       const updated = await db.query<{ points: number }>(

@@ -7,11 +7,11 @@ import { RANK_COLORS } from "./RankBadge";
 
 const STATION = 22; // px, station dot
 
-export default function RankLine({ unlocked, tone = "light" }: { unlocked: number; tone?: "light" | "dark" }) {
-  const { rank, next, unlocksToNext } = rankProgress(unlocked);
+export default function RankLine({ points, tone = "light" }: { points: number; tone?: "light" | "dark" }) {
+  const { rank, next, pointsToNext, fraction } = rankProgress(points);
   const idx = RANKS.findIndex((r) => r.id === rank.id);
   // How far you are from this station to the next one, 0 to 1.
-  const frac = next ? Math.min(1, Math.max(0, (unlocked - rank.minUnlocks) / (next.minUnlocks - rank.minUnlocks))) : 0;
+  const frac = next ? fraction : 0;
   const target = (idx + frac) / (RANKS.length - 1); // 0 to 1 along the whole line
 
   // The marker rolls out from the first station when the line appears.
@@ -25,7 +25,7 @@ export default function RankLine({ unlocked, tone = "light" }: { unlocked: numbe
   const dark = tone === "dark";
 
   return (
-    <div role="group" aria-label={`Rank: ${rank.name}. ${next ? `${unlocksToNext} more ${unlocksToNext === 1 ? "unlock" : "unlocks"} to ${next.name}.` : "Top rank."}`}>
+    <div role="group" aria-label={`Rank: ${rank.name}. ${next ? `${pointsToNext} more points to ${next.name}.` : "Top rank."}`}>
       <div className="relative h-[70px]">
         {/* the track: grey underneath, colored up to the marker */}
         <div className="absolute top-[34px] h-[6px] rounded-full" style={{ left: STATION / 2, right: STATION / 2, background: dark ? "#2B3136" : "#B9BEC3" }} />
@@ -83,7 +83,7 @@ export default function RankLine({ unlocked, tone = "light" }: { unlocked: numbe
         {RANKS.map((r, i) => (
           <li key={r.id} className="w-1/4 first:text-left last:text-right [&:not(:first-child):not(:last-child)]:text-center">
             <p className={`text-[13px] font-extrabold leading-tight ${i === idx ? "" : dark ? "text-white/70" : "text-muted"}`}>{r.name}</p>
-            <p className={`text-[12px] ${dark ? "text-white/60" : "text-muted"}`}>{r.minUnlocks === 0 ? "start" : `${r.minUnlocks} ${r.minUnlocks === 1 ? "unlock" : "unlocks"}`}</p>
+            <p className={`text-[12px] ${dark ? "text-white/60" : "text-muted"}`}>{r.minPoints === 0 ? "start" : `${r.minPoints} pts`}</p>
           </li>
         ))}
       </ol>
@@ -91,7 +91,7 @@ export default function RankLine({ unlocked, tone = "light" }: { unlocked: numbe
       <p className={`mt-3 text-[15px] font-bold ${dark ? "text-white" : ""}`}>
         {next ? (
           <>
-            {unlocksToNext} more {unlocksToNext === 1 ? "unlock" : "unlocks"} to <span style={{ color: dark ? "#FFB81C" : RANK_COLORS[next.id] }}>{next.name}</span>
+            {pointsToNext} more points to <span style={{ color: dark ? "#FFB81C" : RANK_COLORS[next.id] }}>{next.name}</span>
           </>
         ) : (
           "Top of the line. Most of Boston is yours."

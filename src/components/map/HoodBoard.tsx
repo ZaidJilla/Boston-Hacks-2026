@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import RankMedallion from "@/components/rank/RankMedallion";
+import { usePointsContext } from "./usePointsPreview";
 import { useUser } from "@/lib/auth";
-import { hoodTitle } from "@/lib/scoring";
+import { hoodRankFor, hoodTitle } from "@/lib/scoring";
 import type { LeaderboardRow } from "@/lib/types";
 
 const MEDAL = ["bg-signal", "bg-white border-2 border-ink", "bg-line-orange"];
@@ -12,6 +13,9 @@ const MEDAL = ["bg-signal", "bg-white border-2 border-ink", "bg-line-orange"];
 export default function HoodBoard({ hoodId, hoodName }: { hoodId: string; hoodName: string }) {
   const { user } = useUser();
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
+  const ctx = usePointsContext();
+  const mine = ctx?.hoodSpots.get(hoodId) ?? 0;
+  const myRank = hoodRankFor(mine);
 
   useEffect(() => {
     let alive = true;
@@ -55,6 +59,11 @@ export default function HoodBoard({ hoodId, hoodName }: { hoodId: string; hoodNa
             </li>
           ))}
         </ol>
+      )}
+      {myRank && rows && rows[0]?.id !== user?.uid && (
+        <p className="mt-2 border-t-2 border-hairline pt-2 text-[13px] font-bold text-muted">
+          You: <span className="font-black uppercase tracking-[0.4px] text-ink">{myRank.name}</span> here · {mine} {mine === 1 ? "spot" : "spots"}
+        </p>
       )}
     </section>
   );

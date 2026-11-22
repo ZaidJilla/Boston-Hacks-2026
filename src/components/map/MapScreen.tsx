@@ -118,9 +118,9 @@ function FilterPill({
 }
 
 export default function MapScreen() {
-  const { unlocked, checkins, uid, loaded } = useUnlocked();
-  const { rank, next, unlocksToNext } = rankProgress(unlocked.size);
-  const { rankUp, dismiss: dismissRankUp } = useRankUp(uid, unlocked.size, loaded);
+  const { unlocked, checkins, points, uid, loaded } = useUnlocked();
+  const { rank, next, pointsToNext } = rankProgress(points);
+  const { rankUp, dismiss: dismissRankUp } = useRankUp(uid, points, loaded);
 
   const [filters, setFilters] = useState<RestaurantFilters>(DEFAULT_FILTERS);
   const [sheet, setSheet] = useState<FilterSection | null>(null);
@@ -278,7 +278,7 @@ export default function MapScreen() {
             <Link
               href="/profile"
               aria-label={`${rank.name}, ${unlocked.size} of ${TOTAL_HOODS} neighborhoods unlocked${
-                next ? `, ${unlocksToNext} more to ${next.name}` : ""
+                next ? `, ${pointsToNext} points to ${next.name}` : ""
               }`}
               className="flex min-h-[44px] shrink-0 items-center gap-2 rounded-full bg-white px-3 text-[14px] font-extrabold text-ink"
             >
@@ -326,7 +326,7 @@ export default function MapScreen() {
             </div>
           )}
 
-          <RankStrip unlocked={unlocked.size} />
+          <RankStrip points={points} />
         </div>
         <LineStripe />
       </header>
@@ -408,7 +408,7 @@ export default function MapScreen() {
         </div>
       </div>
 
-      {rankUp && <RankUpScreen rank={rankUp} unlocked={unlocked.size} onClose={dismissRankUp} />}
+      {rankUp && <RankUpScreen rank={rankUp} points={points} onClose={dismissRankUp} />}
 
       <FilterSheet
         open={sheet !== null}

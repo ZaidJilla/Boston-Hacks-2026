@@ -14,7 +14,7 @@ import Button, { buttonClass } from "@/components/ui/Button";
 import { useUser } from "@/lib/auth";
 import { LINE_COLORS } from "@/lib/config";
 import { factsFrom } from "@/lib/badges";
-import { rankProgress } from "@/lib/scoring";
+import { hoodRankFor, rankProgress } from "@/lib/scoring";
 import { stations } from "@/lib/data";
 import type { HomeResult, Profile } from "@/lib/types";
 
@@ -143,16 +143,16 @@ export default function ProfilePage() {
           <>
             <section aria-labelledby="rank-h" className="surface-dark rounded-card bg-ink p-4 text-white">
               <div className="mb-3 flex items-center gap-4">
-                <RankMedallion rankId={rankProgress(unlocked).rank.id} size={96} />
+                <RankMedallion rankId={rankProgress(profile.points).rank.id} size={96} />
                 <div className="min-w-0">
                   <h2 id="rank-h" className="eyebrow text-signal">
                     Your rank
                   </h2>
-                  <p className="text-[26px] font-black leading-tight tracking-[-0.5px]">{rankProgress(unlocked).rank.name}</p>
-                  <p className="text-[14px] text-white/80">{rankProgress(unlocked).rank.blurb}</p>
+                  <p className="text-[26px] font-black leading-tight tracking-[-0.5px]">{rankProgress(profile.points).rank.name}</p>
+                  <p className="text-[14px] text-white/80">{rankProgress(profile.points).rank.blurb}</p>
                 </div>
               </div>
-              <RankLine unlocked={unlocked} tone="dark" />
+              <RankLine points={profile.points} tone="dark" />
             </section>
 
             <ul className="grid grid-cols-3 gap-2.5" aria-label="Your totals">
@@ -176,7 +176,14 @@ export default function ProfilePage() {
                 {(profile?.neighborhoods ?? []).slice(0, SHOW_FIRST).map((n) => (
                   <li key={n.id} className="rounded-card border-2 border-hairline bg-white px-3 py-2.5">
                     <div className="mb-2 flex items-center justify-between gap-3">
-                      <span className="truncate text-[16px] font-extrabold">{n.name}</span>
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-[16px] font-extrabold">{n.name}</span>
+                        {hoodRankFor(n.visited) && (
+                          <span className="shrink-0 rounded-full bg-panel px-2 py-0.5 text-[11px] font-black uppercase tracking-[0.4px]">
+                            {hoodRankFor(n.visited)?.name}
+                          </span>
+                        )}
+                      </span>
                       <span
                         className={`shrink-0 rounded-full px-2.5 py-0.5 text-[12px] font-black ${
                           n.unlocked ? "bg-line-green text-white" : "bg-panel text-muted"

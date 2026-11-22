@@ -7,6 +7,7 @@ export function reasonText(p: ReturnType<typeof previewFor>): string {
   const bits: string[] = [];
   if (p.inHome) bits.push("home neighborhood, half base");
   else if (p.multiplier > 1) bits.push(`×${p.multiplier} for ${p.stopsFromHome} stops from home`);
+  if (p.depth < 1) bits.push(`×${p.depth} you know it well`);
   if (p.newNeighborhood) bits.push("new neighborhood");
   if (p.newLine) bits.push("new line");
   return bits.join(", ");
