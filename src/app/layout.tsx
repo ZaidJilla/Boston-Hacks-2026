@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/lib/auth";
 import { APP_NAME } from "@/lib/config";
 import BottomNav from "@/components/nav/BottomNav";
+import RouteTransition from "@/components/nav/RouteTransition";
 
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800", "900"], variable: "--font-inter" });
 
@@ -20,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AuthProvider>
           <main className="min-h-screen pb-nav">{children}</main>
           <BottomNav />
+          <RouteTransition />
         </AuthProvider>
       </body>
     </html>

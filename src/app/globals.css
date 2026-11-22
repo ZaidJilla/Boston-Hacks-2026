@@ -106,9 +106,27 @@ body { background: #FFFFFF; color: #000000; }
 .unlock-rings { animation: unlock-rings-in 1s 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
 .unlock-spark { animation: unlock-spark 0.4s var(--d, 0s) backwards, unlock-twinkle 3.2s ease-in-out calc(var(--d, 0s) + 0.5s) infinite; }
 
+/* Between screens: the T line colors sweep off to the right, like a train pulling out. */
+@keyframes route-sweep { from { transform: translateX(0); } to { transform: translateX(108%); } }
+.route-band {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-radius: 0 44px 44px 0;
+  animation: route-sweep 0.5s cubic-bezier(0.6, 0, 0.9, 0.45) both;
+  will-change: transform;
+}
+/* The tab you just opened: its icon pops and its line-colored bar grows across. */
+@keyframes nav-pop { 0% { transform: scale(0.7); } 55% { transform: scale(1.3) translateY(-3px); } 100% { transform: none; } }
+@keyframes nav-bar { from { transform: scaleX(0); } to { transform: none; } }
+.nav-pop { animation: nav-pop 0.38s cubic-bezier(0.2, 0.9, 0.3, 1.3); }
+.nav-bar { transform-origin: left; animation: nav-bar 0.3s ease-out; }
+
 @media (prefers-reduced-motion: reduce) {
-  .page-in, .sheet-up, .fade-in, .unlock-drop, .unlock-ripple, .unlock-pin, .unlock-rise, .unlock-rings, .unlock-spark {
+  .page-in, .sheet-up, .fade-in, .unlock-drop, .unlock-ripple, .unlock-pin, .unlock-rise, .unlock-rings, .unlock-spark,
+  .nav-pop, .nav-bar {
     animation: none !important;
   }
+  .route-band { display: none; }
   .unlock-ripple { display: none; }
 }
