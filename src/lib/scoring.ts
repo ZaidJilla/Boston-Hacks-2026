@@ -222,6 +222,20 @@ export function isUnlocked(distinctRestaurantsInHood: number): boolean {
   return distinctRestaurantsInHood >= UNLOCK_THRESHOLD;
 }
 
+// ---------- Badge thresholds ----------
+// The numbers behind the badges in lib/badges.ts, kept here with the other game rules.
+export const BADGE_RULES = {
+  regularRiderCheckins: 5,
+  doubleDigitsCheckins: 10,
+  centuryPoints: 100,
+  fogClearerUnlocks: 3,
+  cartographerUnlocks: 10,
+  crossTownStops: 5,
+  wayOutStops: 10,
+  tasteTripperKinds: 5,
+  localHeroIndependents: 5,
+} as const;
+
 // ---------- Ranks ----------
 // The overall rank comes from total points, so you keep growing even when you go back to places you have
 // been (the neighborhood ranks below are the ones about breadth). Lowest first.

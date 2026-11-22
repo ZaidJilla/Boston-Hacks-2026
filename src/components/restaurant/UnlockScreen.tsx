@@ -69,7 +69,9 @@ export default function UnlockScreen({
     ? [
         {
           value: b.distancePoints,
-          label: b.multiplier === 1 ? "Check-in" : b.inHomeNeighborhood ? "Check-in, home" : `Check-in ×${b.multiplier}`,
+          label:
+            (b.inHomeNeighborhood ? "Check-in, home" : b.multiplier === 1 ? "Check-in" : `Check-in ×${b.multiplier}`) +
+            (b.depthMultiplier !== 1 ? ` ×${b.depthMultiplier}` : ""),
         },
         ...(b.newNeighborhood ? [{ value: b.newNeighborhood, label: "New neighborhood" }] : []),
         ...(b.unlock ? [{ value: b.unlock, label: "Unlock" }] : []),

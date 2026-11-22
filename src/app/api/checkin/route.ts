@@ -66,6 +66,8 @@ export async function POST(req: Request) {
       lat = body.lat!;
       lng = body.lng!;
     } else if (body.receiptBase64) {
+      // A verified receipt alone is enough (some people can't share location). In the keyless demo,
+      // verifyReceipt returns a canned pass on purpose so the demo works with no API keys.
       const verdict = await verifyReceipt(body.receiptBase64, r.name);
       if (!verdict.valid) return fail(verdict.reason ?? "Receipt not verified", 422);
     } else {
@@ -84,10 +86,16 @@ export async function POST(req: Request) {
   const homeStation = getHome(user.uid).stationId;
   let outcome;
   let earned: ReturnType<typeof badgeCard>[] = [];
+  // Badges are a nicety: a failed lookup here must never stop the check-in from saving.
+  let before: ReturnType<typeof factsFrom> | null = null;
   try {
-    const before = factsFrom(await store.getProfile(user), homeStation);
+    before = factsFrom(await store.getProfile(user), homeStation);
+  } catch (err) {
+    console.error("badge facts failed", err);
+  }
+  try {
     outcome = await store.recordCheckin({ user, restaurant: r, lines, lat, lng, co2SavedKg: co2, distance: distanceFromHome(user.uid, r) });
-    if (outcome.ok) {
+    if (outcome.ok && before) {
       try {
         earned = newBadges(before, factsFrom(await store.getProfile(user), homeStation)).map(badgeCard);
       } catch (err) {

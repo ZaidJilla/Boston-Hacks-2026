@@ -4,6 +4,7 @@
 // to announce new badges.
 import { LINE_COLORS } from "./config";
 import { restaurants } from "./data";
+import { BADGE_RULES as R } from "./scoring";
 import { stopsBetween } from "./stationGraph";
 import type { Craving, LineId, Profile } from "./types";
 
@@ -49,14 +50,14 @@ const lineBadge = (line: LineId, name: string, emoji: string, desc: string): Bad
 export const BADGES: Badge[] = [
   // Getting started
   { id: "first-stop", name: "First Stop", emoji: "🚉", color: LINE_COLORS.green, rarity: "common", how: "Check in for the first time.", desc: "Every line starts somewhere. This is yours.", earned: (f) => f.checkins >= 1 },
-  { id: "regular-rider", name: "Regular Rider", emoji: "🎟️", color: LINE_COLORS.blue, rarity: "common", how: "Check in 5 times.", desc: "Five meals in. The conductor knows your face.", earned: (f) => f.checkins >= 5 },
-  { id: "double-digits", name: "Double Digits", emoji: "🔟", color: LINE_COLORS.orange, rarity: "rare", how: "Check in 10 times.", desc: "Ten spots down. You're not just visiting anymore.", earned: (f) => f.checkins >= 10 },
-  { id: "century", name: "Century Club", emoji: "💯", color: LINE_COLORS.red, rarity: "rare", how: "Earn 100 points.", desc: "A hundred points of pure exploring.", earned: (f) => f.points >= 100 },
+  { id: "regular-rider", name: "Regular Rider", emoji: "🎟️", color: LINE_COLORS.blue, rarity: "common", how: "Check in 5 times.", desc: "Five meals in. The conductor knows your face.", earned: (f) => f.checkins >= R.regularRiderCheckins },
+  { id: "double-digits", name: "Double Digits", emoji: "🔟", color: LINE_COLORS.orange, rarity: "rare", how: "Check in 10 times.", desc: "Ten spots down. You're not just visiting anymore.", earned: (f) => f.checkins >= R.doubleDigitsCheckins },
+  { id: "century", name: "Century Club", emoji: "💯", color: LINE_COLORS.red, rarity: "rare", how: "Earn 100 points.", desc: "A hundred points of pure exploring.", earned: (f) => f.points >= R.centuryPoints },
 
   // Clearing the fog
   { id: "fog-lifter", name: "Fog Lifter", emoji: "🌤️", color: LINE_COLORS.blue, rarity: "common", how: "Unlock your first neighborhood.", desc: "You cleared the first patch of fog.", earned: (f) => f.unlockedCount >= 1 },
-  { id: "fog-clearer", name: "Fog Clearer", emoji: "☀️", color: LINE_COLORS.orange, rarity: "rare", how: "Unlock 3 neighborhoods.", desc: "Three neighborhoods, no fog in sight.", earned: (f) => f.unlockedCount >= 3 },
-  { id: "cartographer", name: "Cartographer", emoji: "🗺️", color: LINE_COLORS.red, rarity: "legendary", how: "Unlock 10 neighborhoods.", desc: "You could draw this map from memory.", earned: (f) => f.unlockedCount >= 10 },
+  { id: "fog-clearer", name: "Fog Clearer", emoji: "☀️", color: LINE_COLORS.orange, rarity: "rare", how: "Unlock 3 neighborhoods.", desc: "Three neighborhoods, no fog in sight.", earned: (f) => f.unlockedCount >= R.fogClearerUnlocks },
+  { id: "cartographer", name: "Cartographer", emoji: "🗺️", color: LINE_COLORS.red, rarity: "legendary", how: "Unlock 10 neighborhoods.", desc: "You could draw this map from memory.", earned: (f) => f.unlockedCount >= R.cartographerUnlocks },
 
   // Riding the T
   lineBadge("red", "Red Hot Rider", "🌶️", "Spicy. You ate your way along the Red Line."),
@@ -71,8 +72,8 @@ export const BADGES: Badge[] = [
   },
 
   // Going far
-  { id: "cross-town", name: "Cross-Town Traffic", emoji: "🚦", color: LINE_COLORS.green, rarity: "rare", how: "Eat 5 or more stops from home.", desc: "Five stops from home and still hungry.", earned: (f) => f.maxStopsFromHome >= 5 },
-  { id: "way-out", name: "Way Out There", emoji: "🚀", color: LINE_COLORS.blue, rarity: "epic", how: "Eat 10 or more stops from home.", desc: "Ten stops from home. Past your campus bubble.", earned: (f) => f.maxStopsFromHome >= 10 },
+  { id: "cross-town", name: "Cross-Town Traffic", emoji: "🚦", color: LINE_COLORS.green, rarity: "rare", how: "Eat 5 or more stops from home.", desc: "Five stops from home and still hungry.", earned: (f) => f.maxStopsFromHome >= R.crossTownStops },
+  { id: "way-out", name: "Way Out There", emoji: "🚀", color: LINE_COLORS.blue, rarity: "epic", how: "Eat 10 or more stops from home.", desc: "Ten stops from home. Past your campus bubble.", earned: (f) => f.maxStopsFromHome >= R.wayOutStops },
 
   // What you ate
   cravingBadge("dumpling", "Dumpling Diplomat", "🥟", "chinese", "You made friends over dumplings.", "Eat at a Chinese spot.", LINE_COLORS.red),
@@ -81,8 +82,8 @@ export const BADGES: Badge[] = [
   cravingBadge("taco", "Taco Tourist", "🌮", "tacos", "Tuesday every day.", "Eat at a taco or Latin spot.", LINE_COLORS.green),
   cravingBadge("sweet", "Sweet Tooth", "🍦", "dessert", "Dessert first, no regrets.", "Eat at a dessert or boba spot.", LINE_COLORS.red),
   cravingBadge("coffee", "Caffeine Collector", "☕", "coffee", "Fueled by espresso and croissants.", "Eat at a coffee or bakery spot.", LINE_COLORS.orange),
-  { id: "taste-tripper", name: "Taste Tripper", emoji: "🍽️", color: LINE_COLORS.silver, rarity: "epic", how: "Eat 5 different kinds of food.", desc: "Five cuisines. Your taste buds have a passport.", earned: (f) => f.cravings.size >= 5 },
-  { id: "local-hero", name: "Local Hero", emoji: "🦸", color: LINE_COLORS.green, rarity: "rare", how: "Eat at 5 independent spots.", desc: "You keep the neighborhood spots in business.", earned: (f) => f.independents >= 5 },
+  { id: "taste-tripper", name: "Taste Tripper", emoji: "🍽️", color: LINE_COLORS.silver, rarity: "epic", how: "Eat 5 different kinds of food.", desc: "Five cuisines. Your taste buds have a passport.", earned: (f) => f.cravings.size >= R.tasteTripperKinds },
+  { id: "local-hero", name: "Local Hero", emoji: "🦸", color: LINE_COLORS.green, rarity: "rare", how: "Eat at 5 independent spots.", desc: "You keep the neighborhood spots in business.", earned: (f) => f.independents >= R.localHeroIndependents },
 ];
 
 /** Best first: rarest, then by order in the list. Earned badges lead; locked ones follow, easiest first. */

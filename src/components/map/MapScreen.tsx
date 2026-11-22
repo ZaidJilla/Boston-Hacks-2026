@@ -118,9 +118,9 @@ function FilterPill({
 }
 
 export default function MapScreen() {
-  const { unlocked, checkins, points, uid, loaded } = useUnlocked();
+  const { unlocked, checkins, points, uid, loaded, source } = useUnlocked();
   const { rank, next, pointsToNext } = rankProgress(points);
-  const { rankUp, dismiss: dismissRankUp } = useRankUp(uid, points, loaded);
+  const { rankUp, dismiss: dismissRankUp } = useRankUp(uid, points, loaded && source === "profile"); // never judge a rank-up on fallback data
 
   const [filters, setFilters] = useState<RestaurantFilters>(DEFAULT_FILTERS);
   const [sheet, setSheet] = useState<FilterSection | null>(null);
@@ -246,7 +246,9 @@ export default function MapScreen() {
     const m = new Map<string, number>();
     for (const r of visible) {
       const p = previewFor(pointsCtx, r);
-      if (p.multiplier > 1) m.set(r.id, p.multiplier);
+      // The tag is what the visit actually pays: distance bonus times the depth falloff.
+      const pays = p.multiplier * p.depth;
+      if (pays > 1) m.set(r.id, pays);
     }
     return m;
   }, [pointsCtx, visible]);

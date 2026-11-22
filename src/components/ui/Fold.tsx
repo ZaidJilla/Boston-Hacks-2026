@@ -29,7 +29,15 @@ export default function Fold({ open, id, children }: { open: boolean; id?: strin
       if (performance.now() < end) raf = requestAnimationFrame(hold);
     };
     raf = requestAnimationFrame(hold);
-    return () => cancelAnimationFrame(raf);
+    // If the user scrolls themselves, let go: don't fight their finger.
+    const stop = () => cancelAnimationFrame(raf);
+    window.addEventListener("wheel", stop, { passive: true });
+    window.addEventListener("touchstart", stop, { passive: true });
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("wheel", stop);
+      window.removeEventListener("touchstart", stop);
+    };
   }, [open]);
 
   return (

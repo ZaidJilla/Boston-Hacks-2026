@@ -86,7 +86,7 @@ export async function byNeighborhood(neighborhood: string, limit = 50): Promise<
                FROM checkins_daily d JOIN users u USING (uid)
               WHERE d.neighborhood = $1
               GROUP BY u.uid, u.display_name, u.college
-              ORDER BY points DESC, name LIMIT $2`,
+              ORDER BY points DESC, MAX(d.day), name LIMIT $2`, // ties: whoever got there first
             [neighborhood, limit],
           )
         ).rows;
@@ -98,7 +98,7 @@ export async function byNeighborhood(neighborhood: string, limit = 50): Promise<
                FROM checkins c JOIN users u USING (uid)
               WHERE c.neighborhood = $1 AND c.verified
               GROUP BY u.uid, u.display_name, u.college
-              ORDER BY points DESC, name LIMIT $2`,
+              ORDER BY points DESC, MAX(c.created_at), name LIMIT $2`,
             [neighborhood, limit],
           )
         ).rows;
@@ -107,16 +107,18 @@ export async function byNeighborhood(neighborhood: string, limit = 50): Promise<
     () => {
       ensureMemSeeded();
       const perUser = new Map<string, Set<string>>();
+      const lastAt = new Map<string, number>(); // when they reached their current count
       for (const c of mem.checkins) {
         if (c.neighborhood !== neighborhood || !c.verified) continue;
         perUser.set(c.uid, (perUser.get(c.uid) ?? new Set()).add(c.restaurantId));
+        lastAt.set(c.uid, Math.max(lastAt.get(c.uid) ?? 0, c.createdAt));
       }
       return [...perUser.entries()]
         .map(([uid, rs]) => {
           const u = mem.users.get(uid);
           return { id: uid, name: u?.displayName ?? "Player", college: u?.college, points: rs.size };
         })
-        .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name))
+        .sort((a, b) => b.points - a.points || (lastAt.get(a.id) ?? 0) - (lastAt.get(b.id) ?? 0) || a.name.localeCompare(b.name))
         .slice(0, limit);
     },
   );
