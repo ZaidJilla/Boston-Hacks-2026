@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { rankProgress } from "@/lib/scoring";
 import { RANK_COLORS } from "./RankBadge";
 import RankMedallion from "./RankMedallion";
+import Train from "./Train";
 
 export default function RankStrip({ points }: { points: number }) {
   const { rank, next, pointsToNext, fraction: pct } = rankProgress(points);
@@ -28,11 +29,20 @@ export default function RankStrip({ points }: { points: number }) {
     >
       <RankMedallion rankId={rank.id} size={36} ribbon={false} />
       <span className="shrink-0 text-[14px] font-black">{rank.name}</span>
-      <span className="relative h-2.5 flex-1 overflow-hidden rounded-full bg-white/25" aria-hidden="true">
+      {/* A little train riding a track toward the next rank */}
+      <span className="relative h-8 min-w-[56px] flex-1" aria-hidden="true">
+        <span className="absolute inset-x-0 top-[19px] h-[4px] rounded-full bg-white/25" />
         <span
-          className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-1000 ease-out motion-reduce:transition-none"
+          className="absolute left-0 top-[19px] h-[4px] rounded-full transition-[width] duration-1000 ease-out motion-reduce:transition-none"
           style={{ width: `${shown * 100}%`, background: RANK_COLORS[(next ?? rank).id] }}
         />
+        <span
+          className="absolute top-0 transition-[left] duration-1000 ease-out motion-reduce:transition-none"
+          style={{ left: `calc((100% - 44px) * ${shown})` }}
+        >
+          <Train color={RANK_COLORS[rank.id]} width={44} />
+        </span>
+        <span className="absolute right-0 top-[15] h-3 w-3 rounded-full border-[3px] border-white bg-black" style={{ top: 15 }} />
       </span>
       <span className="shrink-0 text-[13px] font-extrabold">{label}</span>
     </Link>
