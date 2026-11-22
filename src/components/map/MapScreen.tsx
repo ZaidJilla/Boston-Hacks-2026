@@ -11,7 +11,6 @@ import {
   distanceM,
   filterPlaces,
   filterRestaurants,
-  MAP_LAYERS,
   mapPlaces,
   LINE_ORDER,
   lineColor,
@@ -32,6 +31,10 @@ import FilterSheet, { type FilterSection } from "./FilterSheet";
 import PeekCard from "./PeekCard";
 import PlaceCard from "./PlaceCard";
 import { useUnlocked } from "./useUnlocked";
+import { useRankUp } from "./useRankUp";
+import RankBadge from "@/components/rank/RankBadge";
+import RankUpScreen from "@/components/rank/RankUpScreen";
+import { rankProgress } from "@/lib/scoring";
 
 const TOTAL_HOODS = neighborhoods.features.length;
 
@@ -57,6 +60,17 @@ function locate(): Promise<{ lat: number; lng: number }> {
   });
 }
 
+const ALL_LAYERS: MapLayer[] = ["food", "landmark", "shopping"];
+const LAYER_NAME: Record<MapLayer, string> = { food: "Food", landmark: "Landmarks", shopping: "Shopping" };
+
+/** Left pill: what is on the map. Short, so all three pills fit at 375 px. */
+function layerSummary(layers: Set<MapLayer>): string {
+  if (layers.size === ALL_LAYERS.length) return "Places";
+  if (!layers.size) return "Nothing";
+  if (layers.size === 1) return LAYER_NAME[ALL_LAYERS.find((l) => layers.has(l))!];
+  return `${layers.size} types`;
+}
+
 /** "$ to $$", "$$", "$, $$$" */
 function priceSummary(prices: number[]): string {
   const p = [...prices].sort();
@@ -76,11 +90,13 @@ function FilterPill({
   onClick,
   children,
   label,
+  className = "",
 }: {
   active: boolean;
   onClick: () => void;
   children: React.ReactNode;
   label: string;
+  className?: string;
 }) {
   return (
     <button
@@ -90,7 +106,7 @@ function FilterPill({
       aria-haspopup="dialog"
       className={`flex h-11 min-w-0 flex-auto items-center justify-center gap-1.5 rounded-full px-3.5 text-[15px] font-extrabold ${
         active ? "bg-signal text-ink" : "bg-white text-ink"
-      }`}
+      } ${className}`}
     >
       {children}
       <ChevronDownIcon size={16} className="shrink-0" />
@@ -99,7 +115,9 @@ function FilterPill({
 }
 
 export default function MapScreen() {
-  const { unlocked, checkins } = useUnlocked();
+  const { unlocked, checkins, uid, loaded } = useUnlocked();
+  const { rank, next, unlocksToNext } = rankProgress(unlocked.size);
+  const { rankUp, dismiss: dismissRankUp } = useRankUp(uid, unlocked.size, loaded);
 
   const [filters, setFilters] = useState<RestaurantFilters>(DEFAULT_FILTERS);
   const [sheet, setSheet] = useState<FilterSection | null>(null);
@@ -114,7 +132,8 @@ export default function MapScreen() {
 
   // Default view is the neighborhoods and a few famous landmarks. Every restaurant, shop and smaller
   // landmark appears once a neighborhood is opened or a filter is set.
-  const focused = activeFilterCount(filters) > 0;
+  const layersChanged = layers.size !== ALL_LAYERS.length;
+  const focused = activeFilterCount(filters) > 0 || layersChanged;
   const visible = useMemo(
     () => (focused && layers.has("food") ? filterRestaurants(restaurants, filters) : []),
     [focused, filters, layers],
@@ -123,7 +142,7 @@ export default function MapScreen() {
   // them is what pulls people toward somewhere new. Everything else shows once a neighborhood opens.
   const visiblePlaces = useMemo(() => {
     const all = mapPlaces.filter((p) => p.type !== "store");
-    const iconic = all.filter((p) => p.iconic);
+    const iconic = layers.has("landmark") ? all.filter((p) => p.iconic) : [];
     if (!focused) return iconic;
     const rest = filterPlaces(
       all.filter((p) => !p.iconic && layers.has(p.type === "landmark" ? "landmark" : "shopping")),
@@ -132,13 +151,8 @@ export default function MapScreen() {
     return [...iconic, ...rest];
   }, [focused, filters, layers]);
 
-  const toggleLayer = useCallback((id: MapLayer) => {
-    setLayers((cur) => {
-      const next = new Set(cur);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const changeLayers = useCallback((next: Set<MapLayer>) => {
+    setLayers(next);
     setSelected(null);
     setSelectedPlace(null);
   }, []);
@@ -200,6 +214,7 @@ export default function MapScreen() {
   }, []);
   const backToAll = useCallback(() => {
     changeFilters(DEFAULT_FILTERS);
+    setLayers(new Set(ALL_LAYERS));
     setHoodInfo(null);
     setFlyTo({ kind: "point", lat: BOSTON_CENTER[0], lng: BOSTON_CENTER[1], zoom: 13 });
   }, [changeFilters]);
@@ -220,7 +235,6 @@ export default function MapScreen() {
   const eaten = pick ? restaurantsIn(pick.neighborhood).filter((r) => checkins.has(r.id)).length : 0;
   const tappedHoodName = hoodInfo ? neighborhoodById.get(hoodInfo)?.properties.name : null;
 
-  const unlockedDots = Math.min(4, unlocked.size === 0 ? 0 : Math.max(1, Math.round((unlocked.size / TOTAL_HOODS) * 4)));
   const lineFilter = filters.lines.length ? LINE_ORDER.filter((l) => filters.lines.includes(l)) : LINE_ORDER.slice(0, 4);
 
   return (
@@ -241,24 +255,26 @@ export default function MapScreen() {
             </div>
             <Link
               href="/profile"
-              className="flex min-h-[44px] items-center gap-2 rounded-full bg-white px-3.5 text-[14px] font-extrabold text-ink"
+              aria-label={`${rank.name}, ${unlocked.size} of ${TOTAL_HOODS} neighborhoods unlocked${
+                next ? `, ${unlocksToNext} more to ${next.name}` : ""
+              }`}
+              className="flex min-h-[44px] shrink-0 items-center gap-2 rounded-full bg-white px-3 text-[14px] font-extrabold text-ink"
             >
-              <span className="flex gap-1" aria-hidden="true">
-                {Array.from({ length: 4 }, (_, i) => (
-                  <span key={i} className={`h-2.5 w-2.5 rounded-full ${i < unlockedDots ? "bg-line-green" : "bg-rail"}`} />
-                ))}
+              <RankBadge rank={rank} />
+              <span aria-hidden="true">
+                {unlocked.size} of {TOTAL_HOODS}
               </span>
-              {unlocked.size} of {TOTAL_HOODS} unlocked
             </Link>
           </div>
 
           <div className="flex gap-2">
             <FilterPill
-              active={filters.cravings.length > 0}
-              onClick={() => setSheet("craving")}
-              label={`Craving filter: ${filters.cravings.length ? cravingSummary(filters.cravings) : "any"}`}
+              active={layersChanged || filters.cravings.length > 0}
+              onClick={() => setSheet("show")}
+              className="!flex-[1.3_1_auto]"
+              label={`What to show: ${layerSummary(layers)}${filters.cravings.length ? `, ${cravingSummary(filters.cravings)}` : ""}`}
             >
-              <span className="truncate">{cravingSummary(filters.cravings)}</span>
+              <span className="truncate">{layerSummary(layers)}</span>
             </FilterPill>
             <FilterPill
               active={filters.prices.length > 0}
@@ -282,15 +298,10 @@ export default function MapScreen() {
           </div>
 
           {focused && (
-            <div className="flex gap-2 overflow-x-auto" role="group" aria-label="Show on map">
-              <Chip onClick={backToAll} aria-pressed={undefined} aria-label="Back to all of Boston" className="!px-3">
-                ✕
+            <div className="flex">
+              <Chip onClick={backToAll} aria-pressed={undefined} aria-label="Back to all of Boston">
+                ✕ All of Boston
               </Chip>
-              {MAP_LAYERS.map((l) => (
-                <Chip key={l.id} selected={layers.has(l.id)} accent onClick={() => toggleLayer(l.id)}>
-                  {l.label}
-                </Chip>
-              ))}
             </div>
           )}
         </div>
@@ -371,12 +382,16 @@ export default function MapScreen() {
         </div>
       </div>
 
+      {rankUp && <RankUpScreen rank={rankUp} unlocked={unlocked.size} onClose={dismissRankUp} />}
+
       <FilterSheet
         open={sheet !== null}
         focusSection={sheet ?? "craving"}
         onClose={closeSheet}
         filters={filters}
         onChange={changeFilters}
+        layers={layers}
+        onLayersChange={changeLayers}
         resultCount={visible.length + visiblePlaces.length}
         unlocked={unlocked}
         onNearMe={nearMe}

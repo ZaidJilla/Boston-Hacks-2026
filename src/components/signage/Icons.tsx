@@ -36,6 +36,13 @@ export const PlanIcon = (p: P) => (
     <path d="M8.2 6H15a3 3 0 0 1 0 6H9a3 3 0 0 0 0 6h6.8" />
   </Icon>
 );
+export const SlidersIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />
+    <circle cx="15" cy="7" r="2" />
+    <circle cx="9" cy="17" r="2" />
+  </Icon>
+);
 export const ChatIcon = (p: P) => (
   <Icon {...p}>
     <path d="M12 4c4.7 0 8 3 8 7s-3.3 7-8 7c-1.2 0-2.3-.2-3.3-.5L4 19l1.3-3.6C4.5 14.2 4 12.7 4 11c0-4 3.3-7 8-7z" />

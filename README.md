@@ -10,7 +10,7 @@ Built in 24 hours at BostonHacks 2026.
 - Filter by craving, budget, and T line
 - Craving concierge: ask for "cheap ramen near the Green Line" and get picks with routes
 - Live MBTA arrivals and transit directions to each spot
-- Receipt check-ins verified with Gemini
+- Check in by being within 50 m or scanning a receipt (receipts verified with Gemini)
 - Line quests and a CO2-saved tracker
 
 ## How we use the sponsors

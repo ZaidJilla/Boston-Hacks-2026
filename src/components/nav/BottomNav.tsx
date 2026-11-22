@@ -33,11 +33,13 @@ export default function BottomNav() {
                 }`}
               >
                 <span
-                  className="absolute inset-x-0 top-0 h-1"
+                  className={`absolute inset-x-0 top-0 h-1 ${active ? "nav-bar" : ""}`}
                   style={{ background: active ? color : "transparent" }}
                   aria-hidden="true"
                 />
-                <Icon size={22} />
+                <span className={`flex ${active ? "nav-pop" : ""}`}>
+                  <Icon size={22} />
+                </span>
                 {label}
               </Link>
             </li>

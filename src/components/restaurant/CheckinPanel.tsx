@@ -1,6 +1,6 @@
 "use client";
-// Sticky check-in bar: geolocation + receipt photo (real), or "Simulate check-in" in demo mode.
-// "Check in" asks for the receipt photo first if there isn't one, then submits.
+// Sticky check-in bar. Two ways in: "Check in" (you are within 50 m, by GPS) or "Scan receipt" (a photo
+// of a receipt from today). One is enough. "Simulate check-in" in demo mode.
 import { useCallback, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Button from "@/components/ui/Button";
@@ -46,22 +46,21 @@ export default function CheckinPanel({
   hoodName: string;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [receipt, setReceipt] = useState<File | null>(null);
   const [result, setResult] = useState<CheckinResult | null>(null);
   const [showUnlock, setShowUnlock] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function submit(simulate: boolean, photo: File | null = receipt) {
+  async function submit(mode: "here" | "receipt" | "simulate", photo?: File) {
     setBusy(true);
     setError(null);
     setResult(null);
     try {
       let extra: Record<string, unknown> = {};
-      if (!simulate) {
+      if (mode === "here") extra = { ...(await getPosition()) };
+      if (mode === "receipt") {
         if (!photo) throw new Error("Add a photo of your receipt first.");
-        const [pos, receiptBase64] = await Promise.all([getPosition(), photoToBase64(photo)]);
-        extra = { ...pos, receiptBase64 };
+        extra = { receiptBase64: await photoToBase64(photo) };
       }
       const idToken = await getClientAuth()?.currentUser?.getIdToken();
       const res = await fetch("/api/checkin", {
@@ -70,7 +69,7 @@ export default function CheckinPanel({
           "Content-Type": "application/json",
           ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
         },
-        body: JSON.stringify({ restaurantId, simulate, ...extra }),
+        body: JSON.stringify({ restaurantId, simulate: mode === "simulate", ...extra }),
       });
       const data = (await res.json()) as CheckinResult;
       if (!data.ok) throw new Error(data.error ?? "Check-in failed.");
@@ -100,8 +99,8 @@ export default function CheckinPanel({
           tabIndex={-1}
           onChange={(e) => {
             const f = e.target.files?.[0] ?? null;
-            setReceipt(f);
-            if (f) submit(false, f);
+            e.target.value = ""; // so the same photo can be picked again after a failed scan
+            if (f) submit("receipt", f);
           }}
         />
 
@@ -130,39 +129,27 @@ export default function CheckinPanel({
         )}
         {!error && !result && (
           <p className="text-[14px] text-muted">
-            {receipt
-              ? `Receipt: ${receipt.name}`
-              : `Be within ${CHECKIN_RADIUS_M} m and add your receipt to check in.`}
+            Be within {CHECKIN_RADIUS_M} m, or scan a receipt from today. One is enough.
           </p>
         )}
 
         <div className="flex gap-2.5">
-          <Button
-            disabled={busy}
-            onClick={() => (receipt ? submit(false) : fileRef.current?.click())}
-            className="flex-1 whitespace-nowrap !px-2 !text-[15px]"
-          >
+          <Button disabled={busy} onClick={() => submit("here")} className="flex-1 whitespace-nowrap !px-2 !text-[15px]">
             {busy ? "Checking in…" : "Check in"}
           </Button>
-          {DEMO_MODE && (
-            <Button
-              variant="dark"
-              disabled={busy}
-              onClick={() => submit(true)}
-              className="flex-1 whitespace-nowrap !px-2 !text-[15px]"
-            >
-              Simulate check-in
-            </Button>
-          )}
-        </div>
-        {receipt && !busy && (
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            disabled={busy}
             onClick={() => fileRef.current?.click()}
-            className="hit-44 text-[14px] font-bold text-line-blue underline underline-offset-2"
+            className="flex-1 whitespace-nowrap !px-2 !text-[15px]"
           >
-            Use a different receipt
-          </button>
+            Scan receipt
+          </Button>
+        </div>
+        {DEMO_MODE && (
+          <Button variant="dark" disabled={busy} onClick={() => submit("simulate")} className="w-full !text-[15px]">
+            Simulate check-in
+          </Button>
         )}
       </div>
 

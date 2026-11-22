@@ -118,7 +118,7 @@ export default function ConciergePage() {
             </p>
             <div className="flex flex-wrap gap-2.5" role="group" aria-label="Examples">
               {ROUTE_EXAMPLES.map((q) => (
-                <button key={q} type="button" disabled={busy} onClick={() => send(q)} className={`${chipClass()} !h-auto !min-h-[44px] !px-4 !py-2 text-left !text-[15px]`}>
+                <button key={q} type="button" disabled={busy} onClick={() => send(q)} className={`${chipClass()} !h-auto !min-h-[44px] !max-w-full !shrink !whitespace-normal !px-4 !py-2 text-left !text-[15px]`}>
                   {q}
                 </button>
               ))}
