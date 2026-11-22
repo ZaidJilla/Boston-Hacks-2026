@@ -4,5 +4,43 @@
 @import "leaflet/dist/leaflet.css";
 
 html, body { height: 100%; }
-body { background: #F6F4EF; color: #14181C; }
+body { background: #FFFFFF; color: #000000; }
+
+/* Keyboard focus: 3px T-blue ring; white on black surfaces (add .surface-dark to the container). */
 :focus-visible { outline: 3px solid #003DA5; outline-offset: 2px; }
+.surface-dark :focus-visible,
+.surface-dark:focus-visible { outline-color: #FFFFFF; }
+
+@layer components {
+  /* Small caps-style signage label */
+  .eyebrow {
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+  }
+  /* Grows the tap area to at least 44px without changing how a small control looks. */
+  .hit-44 { position: relative; }
+  .hit-44::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 44px);
+    height: max(100%, 44px);
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* ---- Map ---- */
+/* Soften the OSM tiles so the T lines, fog and pins carry the map. */
+.signage-map .leaflet-tile-pane { filter: saturate(0.6); }
+/* Fog fill is blurred as a whole pane so it reads as fog, not flat grey. Outlines and labels sit
+   in their own panes and stay crisp. */
+.signage-map .leaflet-fogfill-pane { filter: blur(5px); }
+.signage-map .leaflet-container { font-family: inherit; }
+.signage-map .leaflet-control-attribution { font-size: 10px; }
+
+/* Neighborhood labels and restaurant pins are DOM markers (divIcons). */
+.hood-label, .food-pin { background: none; border: 0; }
