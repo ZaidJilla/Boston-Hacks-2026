@@ -1,5 +1,7 @@
 // Shared contract. Change only after telling the team.
 
+import type { PointsBreakdown, RankId } from "./scoring";
+
 export type LineId = "red" | "orange" | "green" | "blue" | "silver";
 
 export type Craving =
@@ -113,9 +115,13 @@ export interface CheckinResult {
   ok: boolean;
   error?: string;
   pointsEarned: number;
+  /** How pointsEarned was made, line by line (distance multiplier, bonuses). */
+  breakdown?: PointsBreakdown;
   totalPoints: number;
   unlockedNeighborhood?: string;
   questCompleted?: LineId;
+  /** Badges this check-in earned for the first time. */
+  newBadges?: { id: string; name: string; emoji: string; color: string }[];
   co2SavedKg: number;
 }
 
@@ -154,6 +160,8 @@ export interface LeaderboardRow {
   name: string;
   college?: string;
   points: number;
+  /** The player's rank (from neighborhoods unlocked). Players only, not college standings. */
+  rank?: RankId;
 }
 
 export interface HomeState {

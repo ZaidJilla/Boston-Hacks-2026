@@ -57,3 +57,106 @@ body { background: #FFFFFF; color: #000000; }
   box-shadow: none;
 }
 .leaflet-tooltip.famous-label::before { display: none; }
+
+/* Podium blocks and progress bars grow in when a page opens. */
+@keyframes rise {
+  from { transform: scaleY(0.15); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+.rise { transform-origin: bottom; animation: rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@media (prefers-reduced-motion: reduce) { .rise { animation: none; } }
+
+/* ---- Motion ---------------------------------------------------------------------------------
+   Everything below respects "reduce motion": it all switches off in the media query at the end. */
+
+/* Page change: a quick fade. Opacity only, so fixed-position pages (the map) keep working. */
+@keyframes page-in { from { opacity: 0; } to { opacity: 1; } }
+.page-in { animation: page-in 0.22s ease-out both; }
+
+/* Bottom sheet slides up over a fading backdrop. */
+@keyframes sheet-up { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.sheet-up { animation: sheet-up 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.fade-in { animation: fade-in 0.2s ease-out both; }
+
+/* Neighborhood unlocked: the pin drops and lands, rings radiate from the landing point, the rest
+   rises in behind it. Impact is at 52% of the 1s drop (plus 200ms delay), about 0.72s in. */
+@keyframes unlock-drop {
+  0% { transform: translateY(-280px) scale(1.15); opacity: 0; animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.6); }
+  14% { opacity: 1; }
+  52% { transform: translateY(0) scale(1.1, 0.9); animation-timing-function: ease-out; }
+  68% { transform: translateY(-26px) scale(0.98, 1.02); animation-timing-function: ease-in; }
+  84% { transform: translateY(0) scale(1.03, 0.97); animation-timing-function: ease-out; }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes unlock-ripple {
+  0% { transform: scale(1); opacity: 0.75; }
+  100% { transform: scale(4.4); opacity: 0; }
+}
+@keyframes unlock-pin { 0% { transform: scale(0.5); } 60% { transform: scale(1.2); } 100% { transform: scale(1); } }
+@keyframes unlock-rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
+@keyframes unlock-rings-in { from { opacity: 0; scale: 0.6; } to { opacity: 1; scale: 1; } }
+@keyframes unlock-spark { from { opacity: 0; scale: 0; } to { opacity: 1; scale: 1; } }
+@keyframes unlock-twinkle { 0%, 100% { opacity: 1; translate: 0 0; } 50% { opacity: 0.45; translate: 0 -7px; } }
+
+@keyframes badge-pop { 0% { opacity: 0; transform: scale(0.4) rotate(-8deg); } 100% { opacity: 1; transform: none; } }
+@keyframes badge-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(0.88) translateY(8px); } }
+@keyframes fade-out { from { opacity: 1; } to { opacity: 0; } }
+.unlock-drop { animation: unlock-drop 1s 0.2s both; }
+.unlock-ripple { animation: unlock-ripple 2.7s ease-out infinite backwards; border: 3px solid rgba(255, 255, 255, 0.6); }
+.unlock-pin { animation: unlock-pin 0.45s 0.72s backwards; }
+.unlock-rise { animation: unlock-rise 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--d, 0s); }
+.unlock-rings { animation: unlock-rings-in 1s 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+.badge-out { animation: badge-out 0.22s ease-in both; }
+.fade-out { animation: fade-out 0.22s ease-in both; }
+.badge-pop { animation: badge-pop 0.6s var(--d, 0s) cubic-bezier(0.2, 0.9, 0.3, 1.4) backwards; }
+.unlock-spark { animation: unlock-spark 0.4s var(--d, 0s) backwards, unlock-twinkle 3.2s ease-in-out calc(var(--d, 0s) + 0.5s) infinite; }
+
+/* Between screens: four T-line colored bands roll across the screen like a train, you land on the new
+   page, and they roll off the other side. Each band is a pill wider than the screen, so both rounded
+   ends start off-screen; a white line bullet (R, O, G, B) rides at the front like station signage.
+   Ease-in-out sine keeps the start and stop soft. */
+@keyframes route-in { from { transform: translate3d(calc(-100% - 44px), 0, 0); } to { transform: translate3d(0, 0, 0); } }
+@keyframes route-out { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(calc(100% + 44px), 0, 0); } }
+.route-band {
+  position: absolute;
+  left: -44px;
+  right: -44px;
+  border-radius: 44px;
+  will-change: transform;
+  backface-visibility: hidden;
+  animation-fill-mode: both;
+  animation-timing-function: cubic-bezier(0.37, 0, 0.63, 1);
+}
+.route-band[data-phase="in"] { animation-name: route-in; animation-duration: 0.28s; }
+.route-band[data-phase="out"] { animation-name: route-out; animation-duration: 0.34s; }
+.route-bullet {
+  position: absolute;
+  right: 64px;
+  top: 50%;
+  display: flex;
+  width: 46px;
+  height: 46px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: #fff;
+  color: var(--c);
+  font: 900 22px/1 var(--font-inter), sans-serif;
+  transform: translateY(-50%);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+/* The tab you just opened: its icon pops and its line-colored bar grows across. */
+@keyframes nav-pop { 0% { transform: scale(0.7); } 55% { transform: scale(1.3) translateY(-3px); } 100% { transform: none; } }
+@keyframes nav-bar { from { transform: scaleX(0); } to { transform: none; } }
+.nav-pop { animation: nav-pop 0.38s cubic-bezier(0.2, 0.9, 0.3, 1.3); }
+.nav-bar { transform-origin: left; animation: nav-bar 0.3s ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .page-in, .sheet-up, .fade-in, .unlock-drop, .unlock-ripple, .unlock-pin, .badge-pop, .badge-out, .fade-out, .unlock-rise, .unlock-rings, .unlock-spark,
+  .nav-pop, .nav-bar {
+    animation: none !important;
+  }
+  .route-band { display: none; }
+  .unlock-ripple { display: none; }
+}

@@ -2,6 +2,7 @@
 // database. Never throws.
 import { DEMO_MODE } from "./config";
 import { getPool } from "./db";
+import { rankFor } from "./scoring";
 import { ensureMemSeeded, mem, memLeaderboard } from "./store";
 import type { LeaderboardRow } from "./types";
 
@@ -119,4 +120,27 @@ export async function byNeighborhood(neighborhood: string, limit = 50): Promise<
         .slice(0, limit);
     },
   );
+}
+
+/** Adds each player's rank (from how many neighborhoods they have unlocked). Never throws. */
+export async function withRanks(rows: LeaderboardRow[]): Promise<LeaderboardRow[]> {
+  if (rows.length === 0) return rows;
+  const counts = new Map<string, number>();
+  const pool = getPool();
+  if (pool) {
+    try {
+      const res = await pool.query<{ uid: string; n: number }>(
+        `SELECT uid, COUNT(*)::int AS n FROM unlocks WHERE uid = ANY($1) GROUP BY uid`,
+        [rows.map((r) => r.id)],
+      );
+      for (const r of res.rows) counts.set(r.uid, r.n);
+    } catch (err) {
+      console.error("leaderboard ranks failed", err); // rows just show without a rank
+      return rows;
+    }
+  } else {
+    ensureMemSeeded();
+    for (const r of rows) counts.set(r.id, mem.users.get(r.id)?.unlocked.length ?? 0);
+  }
+  return rows.map((r) => ({ ...r, rank: rankFor(counts.get(r.id) ?? 0).id }));
 }

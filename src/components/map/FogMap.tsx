@@ -4,7 +4,7 @@ import L from "leaflet";
 import { useEffect, useMemo, useState } from "react";
 import { CircleMarker, GeoJSON, MapContainer, Marker, Pane, Polyline, TileLayer, Tooltip, useMap } from "react-leaflet";
 import type { PathOptions } from "leaflet";
-import { BOSTON_CENTER, LINE_COLORS } from "@/lib/config";
+import { BOSTON_CENTER, LINE_COLORS, UNLOCKED_COLOR } from "@/lib/config";
 import {
   BOSTON_BOUNDS,
   lines,
@@ -25,6 +25,8 @@ export type FlyTarget =
 
 interface Props {
   restaurants: Restaurant[];
+  /** point multiplier for this player, for the spots worth more than usual (restaurant id to 1.5 or 2) */
+  boosts?: Map<string, number> | null;
   places: MapPlace[];
   selectedPlaceId: string | null;
   onSelectPlace: (p: MapPlace) => void;
@@ -45,9 +47,16 @@ const AMBER = "#FFB81C";
 /** At this zoom and closer, pins become DOM markers with a ✓ or ? glyph. */
 const PIN_ZOOM = 14;
 
+/**
+ * Pins grow with the map: none while zoomed far out, a small mark at city zoom, full size once you
+ * are in close. 0 at zoom 12 and below, then 0.6, 0.75, 0.9, 1 from zoom 13 to 16.
+ */
+const PIN_MIN_ZOOM = 13;
+const pinScale = (zoom: number) => (zoom < PIN_MIN_ZOOM ? 0 : Math.min(1, 0.6 + (zoom - PIN_MIN_ZOOM) * 0.15));
+
 const FOG_FILL: PathOptions = { stroke: false, fillColor: FOG, fillOpacity: 0.9 };
 const FOG_EDGE: PathOptions = { fill: false, color: MUTED, weight: 2, opacity: 0.9, dashArray: "6 6" };
-const CLEAR_EDGE: PathOptions = { fill: false, color: LINE_COLORS.green, weight: 5, opacity: 1 };
+const CLEAR_EDGE: PathOptions = { fill: false, color: UNLOCKED_COLOR, weight: 5, opacity: 1 };
 
 const escapeHtml = (s: string) =>
   s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
@@ -62,7 +71,7 @@ function Flyer({ target }: { target: FlyTarget }) {
   useEffect(() => {
     if (!target) return;
     // leave room for the top bar and the peek card
-    const pad = { paddingTopLeft: [24, 150] as [number, number], paddingBottomRight: [24, 230] as [number, number] };
+    const pad = { paddingTopLeft: [24, 200] as [number, number], paddingBottomRight: [24, 230] as [number, number] };
     if (target.kind === "bounds") map.flyToBounds(target.bounds, { ...pad, duration: 0.8 });
     else map.flyTo([target.lat, target.lng], target.zoom, { duration: 0.8 });
   }, [map, target]);
@@ -123,15 +132,17 @@ function TLines({ renderer }: { renderer: L.Renderer }) {
 
 function Stations({ renderer }: { renderer: L.Renderer }) {
   const { zoom } = useView();
-  if (zoom < 12) return null;
+  // Station dots grow with the map like the pins do: gone when zoomed far out, bigger as you go in.
+  const scale = pinScale(zoom);
+  if (scale === 0) return null;
   return (
     <>
       {stations.map((s) => (
         <CircleMarker
           key={s.id}
           center={[s.lat, s.lng]}
-          radius={zoom >= 14 ? 4.5 : 3.5}
-          pathOptions={{ renderer, color: INK, weight: 2.5, fillColor: "#FFFFFF", fillOpacity: 1 }}
+          radius={Math.max(2.5, Math.round(5.5 * scale))}
+          pathOptions={{ renderer, color: INK, weight: scale < 0.8 ? 2 : 2.5, fillColor: "#FFFFFF", fillOpacity: 1 }}
         >
           <Tooltip direction="top" offset={[0, -4]}>
             <span className="font-bold">{s.name}</span>
@@ -144,6 +155,11 @@ function Stations({ renderer }: { renderer: L.Renderer }) {
 
 function HoodLabels({ unlocked }: { unlocked: Set<string> }) {
   const { zoom } = useView();
+  // A foggy neighborhood's name and padlock scale with zoom like the pins: gone when zoomed far out
+  // (below zoom 13), then growing. Unlocked names (the green pills) always show.
+  const scale = pinScale(zoom);
+  const lockPx = Math.round(16 * scale);
+  const fontPx = Math.max(10, Math.round(14 * scale));
   const icons = useMemo(
     () =>
       new Map(
@@ -151,12 +167,12 @@ function HoodLabels({ unlocked }: { unlocked: Set<string> }) {
           const name = escapeHtml(f.properties.name);
           const clear = unlocked.has(f.properties.id);
           const html = clear
-            ? `<span style="display:inline-block;transform:translate(-50%,-50%);white-space:nowrap;background:${LINE_COLORS.green};color:#fff;border-radius:999px;padding:4px 12px;font:800 13px/1.2 var(--font-inter),sans-serif;letter-spacing:.8px;text-transform:uppercase">${name}</span>`
-            : `<span style="display:flex;flex-direction:column;align-items:center;gap:2px;transform:translate(-50%,-50%);white-space:nowrap;color:#2B3136;font:800 12px/1.2 var(--font-inter),sans-serif;letter-spacing:.8px;text-transform:uppercase;text-shadow:0 0 3px #fff,0 0 6px #fff">${name}<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="#2B3136"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="#2B3136" stroke-width="2.4"/></svg></span>`;
+            ? `<span style="display:inline-block;transform:translate(-50%,-50%);white-space:nowrap;background:${UNLOCKED_COLOR};color:#fff;border-radius:999px;padding:4px 12px;font:800 13px/1.2 var(--font-inter),sans-serif;letter-spacing:.8px;text-transform:uppercase">${name}</span>`
+            : `<span style="display:flex;flex-direction:column;align-items:center;gap:2px;transform:translate(-50%,-50%);white-space:nowrap;color:#2B3136;font:800 ${fontPx}px/1.2 var(--font-inter),sans-serif;letter-spacing:.8px;text-transform:uppercase;text-shadow:0 0 3px #fff,0 0 6px #fff">${name}${lockPx ? `<svg width="${lockPx}" height="${lockPx}" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="#2B3136"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="#2B3136" stroke-width="2.4"/></svg>` : ""}</span>`;
           return [f.properties.id, L.divIcon({ className: "hood-label", html, iconSize: [0, 0], iconAnchor: [0, 0] })];
         }),
       ),
-    [unlocked],
+    [unlocked, lockPx, fontPx],
   );
   if (zoom < 12) return null;
   return (
@@ -164,7 +180,9 @@ function HoodLabels({ unlocked }: { unlocked: Set<string> }) {
       {neighborhoods.features
         // Tiny neighborhoods (Leather District, Bay Village, Chinatown...) pile their names on top of
         // each other when zoomed out, so they get a label once there is room. Unlocked ones always do.
-        .filter((f) => zoom >= 14 || unlocked.has(f.properties.id) || (f.properties.sqmiles ?? 1) >= 0.6)
+        .filter(
+          (f) => unlocked.has(f.properties.id) || (scale > 0 && (zoom >= 14 || (f.properties.sqmiles ?? 1) >= 0.6)),
+        )
         .map((f) => (
           <Marker
             key={f.properties.id}
@@ -194,11 +212,13 @@ function placeIcon(type: MapPlace["type"], state: "selected" | "clear" | "fog", 
     type === "landmark"
       ? `<polygon points="10,1.5 18.5,10 10,18.5 1.5,10" fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round"/>`
       : `<rect x="3" y="3" width="14" height="14" rx="2.5" fill="${fill}" stroke="${stroke}" stroke-width="${w}"/>`;
+  // Small pins keep a 26 px tap target around them.
+  const box = Math.max(size, 26);
   const icon = L.divIcon({
     className: "place-pin",
-    html: `<svg width="${size}" height="${size}" viewBox="0 0 20 20" aria-hidden="true" style="display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35))">${shape}</svg>`,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
+    html: `<div style="width:${box}px;height:${box}px;display:flex;align-items:center;justify-content:center"><svg width="${size}" height="${size}" viewBox="0 0 20 20" aria-hidden="true" style="display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35))">${shape}</svg></div>`,
+    iconSize: [box, box],
+    iconAnchor: [box / 2, box / 2],
   });
   placeIconCache.set(key, icon);
   return icon;
@@ -217,7 +237,7 @@ function PlacePins({
 }) {
   const map = useMap();
   const { zoom, bounds } = useView();
-  const base = zoom <= 13 ? 11 : zoom <= 14 ? 13 : 16;
+  const base = Math.round(18 * pinScale(zoom));
 
   // Label a famous place only if its label doesn't land on one already placed, so downtown doesn't
   // become a pile of overlapping names. Shorter names go first because they pack better.
@@ -240,6 +260,8 @@ function PlacePins({
     // `bounds` changes after every pan or zoom, and label positions are screen-relative
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [places, zoom, bounds, selectedId, map, base]);
+
+  if (base === 0) return null;
 
   return (
     <>
@@ -277,18 +299,26 @@ function PlacePins({
   );
 }
 
-function pinIcon(state: PinState, selected: boolean): L.DivIcon {
-  const size = selected ? 28 : 21;
+/** A spot worth more to you: a little bigger, with a ×1.5 or ×2 tag. */
+const boostTier = (boost: number | undefined) => (boost && boost >= 2 ? 2 : boost && boost > 1 ? 1 : 0);
+
+function pinIcon(state: PinState, selected: boolean, base: number, tier = 0): L.DivIcon {
+  const size = (selected ? base + 6 : base) + tier * 3;
+  const glyphPx = Math.max(7, Math.round(size * 0.55));
   const glyph =
     state === "visited"
-      ? `<svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+      ? `<svg width="${glyphPx}" height="${glyphPx}" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`
       : state === "fog"
-        ? `<span style="font:900 12px/1 var(--font-inter),sans-serif;color:#000">?</span>`
+        ? `<span style="font:900 ${glyphPx}px/1 var(--font-inter),sans-serif;color:#000">?</span>`
         : "";
   const ring = selected ? `box-shadow:0 0 0 3px #fff,0 0 0 6px ${LINE_COLORS.blue};` : "box-shadow:0 2px 4px rgba(0,0,0,.25);";
   return L.divIcon({
     className: "food-pin",
-    html: `<span style="display:flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:999px;border:2px solid #000;background:${PIN_FILL[state]};box-sizing:border-box;${ring}">${glyph}</span>`,
+    html: `<span style="position:relative;display:flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:999px;border:2px solid #000;background:${PIN_FILL[state]};box-sizing:border-box;${ring}">${glyph}${
+      tier && size >= 16
+        ? `<span style="position:absolute;top:-9px;right:-13px;background:#000;color:#FFB81C;border-radius:999px;padding:2px 5px;font:900 10px/1 var(--font-inter),sans-serif">×${tier === 2 ? "2" : "1.5"}</span>`
+        : ""
+    }</span>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   });
@@ -299,6 +329,7 @@ function FoodPins({
   unlocked,
   visited,
   selectedId,
+  boosts,
   renderer,
   onSelect,
 }: {
@@ -306,18 +337,24 @@ function FoodPins({
   unlocked: Set<string>;
   visited: Set<string>;
   selectedId: string | null;
+  boosts?: Map<string, number> | null;
   renderer: L.Renderer;
   onSelect: (r: Restaurant) => void;
 }) {
   const { zoom, bounds } = useView();
+  const scale = pinScale(zoom);
+  const pinPx = Math.round(22 * scale);
   const icons = useMemo(() => {
     const m = new Map<string, L.DivIcon>();
-    for (const s of ["visited", "fog", "clear"] as PinState[]) {
-      m.set(`${s}-0`, pinIcon(s, false));
-      m.set(`${s}-1`, pinIcon(s, true));
-    }
+    for (const s of ["visited", "fog", "clear"] as PinState[])
+      for (const tier of [0, 1, 2]) {
+        m.set(`${s}-0-${tier}`, pinIcon(s, false, pinPx, tier));
+        m.set(`${s}-1-${tier}`, pinIcon(s, true, pinPx, tier));
+      }
     return m;
-  }, []);
+  }, [pinPx]);
+
+  if (scale === 0) return null;
 
   if (zoom >= PIN_ZOOM) {
     // DOM markers only for what's on screen, so a phone isn't juggling 700 of them.
@@ -332,7 +369,7 @@ function FoodPins({
               <Marker
                 key={r.id}
                 position={[r.lat, r.lng]}
-                icon={icons.get(`${pinState(r, unlocked, visited)}-${sel ? 1 : 0}`)!}
+                icon={icons.get(`${pinState(r, unlocked, visited)}-${sel ? 1 : 0}-${boostTier(boosts?.get(r.id))}`)!}
                 title={r.name}
                 zIndexOffset={sel ? 1000 : 0}
                 eventHandlers={{ click: () => onSelect(r) }}
@@ -344,7 +381,7 @@ function FoodPins({
   }
 
   // Small at city zoom so 700 spots don't bury the lines; zoom in for full pins.
-  const radius = zoom <= 12 ? 3 : 4;
+  const radius = Math.max(2, Math.round(4 * scale));
   return (
     <>
       {restaurants.map((r) => {
@@ -353,7 +390,7 @@ function FoodPins({
           <CircleMarker
             key={r.id}
             center={[r.lat, r.lng]}
-            radius={sel ? radius + 4 : radius}
+            radius={(sel ? radius + 4 : radius) + boostTier(boosts?.get(r.id))}
             pathOptions={{
               renderer,
               color: sel ? LINE_COLORS.blue : INK,
@@ -376,6 +413,7 @@ function FoodPins({
 
 export default function FogMap({
   restaurants,
+  boosts,
   places,
   selectedPlaceId,
   onSelectPlace,
@@ -463,7 +501,8 @@ export default function FogMap({
         <Stations renderer={renderers.stations} />
       </Pane>
 
-      <Pane name="hoodlabels" style={{ zIndex: 425, pointerEvents: "none" }}>
+      {/* above every pin, so a neighborhood name is never covered by a dot or diamond */}
+      <Pane name="hoodlabels" style={{ zIndex: 450, pointerEvents: "none" }}>
         <HoodLabels unlocked={unlocked} />
       </Pane>
 
@@ -473,6 +512,7 @@ export default function FogMap({
           unlocked={unlocked}
           visited={visited}
           selectedId={selectedId}
+          boosts={boosts}
           renderer={renderers.food}
           onSelect={onSelectRestaurant}
         />

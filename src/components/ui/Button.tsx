@@ -4,7 +4,7 @@ export type ButtonVariant = "primary" | "dark" | "outline";
 
 /** Pill buttons. primary = T blue, dark = black, outline = 2px black border. 48px tall. */
 export const buttonClass = (variant: ButtonVariant = "primary") =>
-  `inline-flex min-h-[48px] items-center justify-center rounded-full px-6 text-[16px] font-extrabold tracking-[-0.2px] disabled:opacity-50 ${
+  `inline-flex min-h-[48px] items-center justify-center rounded-full px-6 text-[16px] font-extrabold tracking-[-0.2px] transition-transform duration-100 active:scale-[0.97] motion-reduce:transition-none motion-reduce:active:scale-100 disabled:opacity-50 ${
     variant === "primary"
       ? "bg-line-blue text-white"
       : variant === "dark"
@@ -23,7 +23,7 @@ export default function Button({
 
 /** Outline chip: 36px visual, 44px tap area. Selected = black fill (or amber with `accent`). */
 export const chipClass = (selected = false, accent = false) =>
-  `hit-44 inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border-2 px-4 text-[14px] font-bold ${
+  `hit-44 inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border-2 px-4 text-[14px] font-bold transition-transform duration-100 active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100 ${
     selected
       ? accent
         ? "border-signal bg-signal text-ink"
