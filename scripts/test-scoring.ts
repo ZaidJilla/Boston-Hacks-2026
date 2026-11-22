@@ -1,6 +1,6 @@
 /** npm run test:scoring: the exploring-pays points rules. */
 import assert from "node:assert/strict";
-import { describeBreakdown, distanceMultiplier, pointsForCheckin, scoreCheckin } from "../src/lib/scoring";
+import { describeBreakdown, distanceMultiplier, hoodRankFor, hoodTitle, pointsForCheckin, scoreCheckin } from "../src/lib/scoring";
 
 let passed = 0;
 const test = (name: string, fn: () => void) => {
@@ -53,5 +53,18 @@ test("the total is always the sum of the lines", () => {
 });
 test("a far check-in always beats a home check-in", () => {
   assert.ok(scoreCheckin({ ...base, stopsFromHome: 12 }).total > scoreCheckin({ ...base, stopsFromHome: 0, inHomeNeighborhood: true }).total);
+});
+test("neighborhood ranks: Newcomer at 1, Regular at 3, Local at 6; none at 0", () => {
+  assert.equal(hoodRankFor(0), null);
+  assert.equal(hoodRankFor(1)?.name, "Newcomer");
+  assert.equal(hoodRankFor(2)?.name, "Newcomer");
+  assert.equal(hoodRankFor(3)?.name, "Regular");
+  assert.equal(hoodRankFor(6)?.name, "Local");
+});
+test("Mayor is first place with an unlocked neighborhood; otherwise the spots title", () => {
+  assert.equal(hoodTitle(1, 3), "Mayor");
+  assert.equal(hoodTitle(1, 2), "Newcomer");
+  assert.equal(hoodTitle(2, 7), "Local");
+  assert.equal(hoodTitle(5, 0), "Visitor");
 });
 console.log(`\n${passed} passed${process.exitCode ? ", some FAILED" : ""}`);

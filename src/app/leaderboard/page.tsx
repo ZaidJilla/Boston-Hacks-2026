@@ -79,7 +79,7 @@ export default async function LeaderboardPage({
             </Link>
           ))}
         </nav>
-        <Podium rows={top} unit={unit} />
+        <Podium rows={top} unit={unit} hood={tab === "hood"} />
       </PageHeader>
 
       {tab === "college" && college && (
@@ -117,7 +117,7 @@ export default async function LeaderboardPage({
             </Link>
           </div>
         ) : rest.length > 0 ? (
-          <Rows rows={rest} unit={unit} startAt={4} linkToCollege={tab === "college" && !college} />
+          <Rows rows={rest} unit={unit} hood={tab === "hood"} startAt={4} linkToCollege={tab === "college" && !college} />
         ) : (
           <p className="text-[15px] text-muted">That&rsquo;s everyone so far.</p>
         )}

@@ -235,6 +235,28 @@ export function rankFor(unlockedNeighborhoods: number): Rank {
 
 export const rankIndex = (id: RankId): number => RANKS.findIndex((r) => r.id === id);
 
+// ---- Neighborhood ranks ----
+// A title for each neighborhood, from how many of its spots you have eaten at. The player with the most
+// (at least UNLOCK_THRESHOLD, so it has to be a neighborhood they unlocked) is its Mayor.
+export const HOOD_RANKS = [
+  { id: "newcomer", name: "Newcomer", minSpots: 1 },
+  { id: "regular", name: "Regular", minSpots: UNLOCK_THRESHOLD },
+  { id: "local", name: "Local", minSpots: 6 },
+] as const;
+
+/** The title for this many spots in one neighborhood, or null with none. */
+export function hoodRankFor(spots: number): (typeof HOOD_RANKS)[number] | null {
+  let rank: (typeof HOOD_RANKS)[number] | null = null;
+  for (const r of HOOD_RANKS) if (spots >= r.minSpots) rank = r;
+  return rank;
+}
+
+/** What to call a player on a neighborhood board: Mayor for first place, else their title there. */
+export function hoodTitle(place: number, spots: number): string {
+  if (place === 1 && spots >= UNLOCK_THRESHOLD) return "Mayor";
+  return hoodRankFor(spots)?.name ?? "Visitor";
+}
+
 /** Current rank, the next one (if any), and how many more unlocks it takes to get there. */
 export function rankProgress(unlockedNeighborhoods: number): {
   rank: Rank;
