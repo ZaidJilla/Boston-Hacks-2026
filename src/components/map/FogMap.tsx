@@ -130,15 +130,17 @@ function TLines({ renderer }: { renderer: L.Renderer }) {
 
 function Stations({ renderer }: { renderer: L.Renderer }) {
   const { zoom } = useView();
-  if (zoom < 12) return null;
+  // Station dots grow with the map like the pins do: gone when zoomed far out, bigger as you go in.
+  const scale = pinScale(zoom);
+  if (scale === 0) return null;
   return (
     <>
       {stations.map((s) => (
         <CircleMarker
           key={s.id}
           center={[s.lat, s.lng]}
-          radius={zoom >= 14 ? 4.5 : 3.5}
-          pathOptions={{ renderer, color: INK, weight: 2.5, fillColor: "#FFFFFF", fillOpacity: 1 }}
+          radius={Math.max(2.5, Math.round(5.5 * scale))}
+          pathOptions={{ renderer, color: INK, weight: scale < 0.8 ? 2 : 2.5, fillColor: "#FFFFFF", fillOpacity: 1 }}
         >
           <Tooltip direction="top" offset={[0, -4]}>
             <span className="font-bold">{s.name}</span>
@@ -151,6 +153,8 @@ function Stations({ renderer }: { renderer: L.Renderer }) {
 
 function HoodLabels({ unlocked }: { unlocked: Set<string> }) {
   const { zoom } = useView();
+  // The padlock under a foggy neighborhood's name scales with zoom too (none until zoom 13).
+  const lockPx = Math.round(16 * pinScale(zoom));
   const icons = useMemo(
     () =>
       new Map(
@@ -159,11 +163,11 @@ function HoodLabels({ unlocked }: { unlocked: Set<string> }) {
           const clear = unlocked.has(f.properties.id);
           const html = clear
             ? `<span style="display:inline-block;transform:translate(-50%,-50%);white-space:nowrap;background:${LINE_COLORS.green};color:#fff;border-radius:999px;padding:4px 12px;font:800 13px/1.2 var(--font-inter),sans-serif;letter-spacing:.8px;text-transform:uppercase">${name}</span>`
-            : `<span style="display:flex;flex-direction:column;align-items:center;gap:2px;transform:translate(-50%,-50%);white-space:nowrap;color:#2B3136;font:800 12px/1.2 var(--font-inter),sans-serif;letter-spacing:.8px;text-transform:uppercase;text-shadow:0 0 3px #fff,0 0 6px #fff">${name}<svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="#2B3136"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="#2B3136" stroke-width="2.4"/></svg></span>`;
+            : `<span style="display:flex;flex-direction:column;align-items:center;gap:2px;transform:translate(-50%,-50%);white-space:nowrap;color:#2B3136;font:800 12px/1.2 var(--font-inter),sans-serif;letter-spacing:.8px;text-transform:uppercase;text-shadow:0 0 3px #fff,0 0 6px #fff">${name}${lockPx ? `<svg width="${lockPx}" height="${lockPx}" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="#2B3136"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5" fill="none" stroke="#2B3136" stroke-width="2.4"/></svg>` : ""}</span>`;
           return [f.properties.id, L.divIcon({ className: "hood-label", html, iconSize: [0, 0], iconAnchor: [0, 0] })];
         }),
       ),
-    [unlocked],
+    [unlocked, lockPx],
   );
   if (zoom < 12) return null;
   return (
