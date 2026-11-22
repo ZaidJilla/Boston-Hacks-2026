@@ -100,11 +100,15 @@ body { background: #FFFFFF; color: #000000; }
 @keyframes unlock-twinkle { 0%, 100% { opacity: 1; translate: 0 0; } 50% { opacity: 0.45; translate: 0 -7px; } }
 
 @keyframes badge-pop { 0% { opacity: 0; transform: scale(0.4) rotate(-8deg); } 100% { opacity: 1; transform: none; } }
+@keyframes badge-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(0.88) translateY(8px); } }
+@keyframes fade-out { from { opacity: 1; } to { opacity: 0; } }
 .unlock-drop { animation: unlock-drop 1s 0.2s both; }
 .unlock-ripple { animation: unlock-ripple 2.7s ease-out infinite backwards; border: 3px solid rgba(255, 255, 255, 0.6); }
 .unlock-pin { animation: unlock-pin 0.45s 0.72s backwards; }
 .unlock-rise { animation: unlock-rise 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both; animation-delay: var(--d, 0s); }
 .unlock-rings { animation: unlock-rings-in 1s 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+.badge-out { animation: badge-out 0.22s ease-in both; }
+.fade-out { animation: fade-out 0.22s ease-in both; }
 .badge-pop { animation: badge-pop 0.6s var(--d, 0s) cubic-bezier(0.2, 0.9, 0.3, 1.4) backwards; }
 .unlock-spark { animation: unlock-spark 0.4s var(--d, 0s) backwards, unlock-twinkle 3.2s ease-in-out calc(var(--d, 0s) + 0.5s) infinite; }
 
@@ -149,7 +153,7 @@ body { background: #FFFFFF; color: #000000; }
 .nav-bar { transform-origin: left; animation: nav-bar 0.3s ease-out; }
 
 @media (prefers-reduced-motion: reduce) {
-  .page-in, .sheet-up, .fade-in, .unlock-drop, .unlock-ripple, .unlock-pin, .badge-pop, .unlock-rise, .unlock-rings, .unlock-spark,
+  .page-in, .sheet-up, .fade-in, .unlock-drop, .unlock-ripple, .unlock-pin, .badge-pop, .badge-out, .fade-out, .unlock-rise, .unlock-rings, .unlock-spark,
   .nav-pop, .nav-bar {
     animation: none !important;
   }

@@ -8,9 +8,9 @@ import BadgeMedallion from "./BadgeMedallion";
 
 const RARITY_TONE = { common: "bg-panel text-ink", rare: "bg-line-blue text-white", epic: "bg-line-orange text-ink", legendary: "bg-line-red text-white" } as const;
 
-function Tile({ badge, earned, onOpen, delay }: { badge: Badge; earned: boolean; onOpen: () => void; delay: number }) {
+function Tile({ badge, earned, onOpen, delay, plain }: { badge: Badge; earned: boolean; onOpen: () => void; delay: number; plain?: boolean }) {
   return (
-    <li className="unlock-rise" style={{ ["--d" as string]: `${delay}s` }}>
+    <li className={plain ? undefined : "unlock-rise"} style={{ ["--d" as string]: `${delay}s` }}>
       <button
         type="button"
         onClick={onOpen}
@@ -25,18 +25,31 @@ function Tile({ badge, earned, onOpen, delay }: { badge: Badge; earned: boolean;
   );
 }
 
+const EXIT_MS = 220;
+
 function BadgeSheet({ badge, earned, onClose }: { badge: Badge; earned: boolean; onClose: () => void }) {
   const close = useRef<HTMLButtonElement>(null);
+  // Closing plays the exit animation first, then tells the parent to unmount.
+  const [leaving, setLeaving] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout>>();
+  const dismiss = () => {
+    if (leaving) return;
+    setLeaving(true);
+    timer.current = setTimeout(onClose, EXIT_MS);
+  };
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const dismissRef = useRef(dismiss);
+  dismissRef.current = dismiss;
   useEffect(() => {
     close.current?.focus();
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && dismissRef.current();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, []);
   return createPortal(
     <div className="fixed inset-0 z-[2000] flex items-center justify-center px-5" role="dialog" aria-modal="true" aria-labelledby="badge-title">
-      <button type="button" aria-label="Close" onClick={onClose} className="fade-in absolute inset-0 cursor-default bg-black/60" tabIndex={-1} />
-      <div className="badge-pop relative w-full max-w-sm rounded-sheet bg-white px-6 pb-6 pt-7 text-center shadow-card">
+      <button type="button" aria-label="Close" onClick={dismiss} className={`absolute inset-0 cursor-default bg-black/60 ${leaving ? "fade-out" : "fade-in"}`} tabIndex={-1} />
+      <div className={`relative w-full max-w-sm rounded-sheet bg-white px-6 pb-6 pt-7 text-center shadow-card ${leaving ? "badge-out" : "badge-pop"}`}>
         <div className="mx-auto flex w-fit justify-center">
           <BadgeMedallion emoji={badge.emoji} color={badge.color} earned={earned} size={96} />
         </div>
@@ -46,7 +59,7 @@ function BadgeSheet({ badge, earned, onClose }: { badge: Badge; earned: boolean;
         <p className="mt-3 rounded-card bg-panel px-3 py-2.5 text-[14px] font-bold">
           {earned ? "You've earned this one." : `How to get it: ${badge.how}`}
         </p>
-        <button ref={close} type="button" onClick={onClose} className="mt-5 min-h-[48px] w-full rounded-full bg-ink text-[16px] font-extrabold text-white">
+        <button ref={close} type="button" onClick={dismiss} className="mt-5 min-h-[48px] w-full rounded-full bg-ink text-[16px] font-extrabold text-white">
           Close
         </button>
       </div>
@@ -73,11 +86,24 @@ export default function BadgeShelf({ facts }: { facts: Facts }) {
       <ul className="grid grid-cols-3 gap-2.5">
         {featured.map((b, i) => <Tile key={b.id} badge={b} earned={have.has(b.id)} onOpen={() => setOpen(b)} delay={i * 0.05} />)}
       </ul>
-      {all && (
-        <ul id="badges-rest" className="grid grid-cols-3 gap-2.5">
-          {rest.map((b, i) => <Tile key={b.id} badge={b} earned={have.has(b.id)} onOpen={() => setOpen(b)} delay={Math.min(i, 10) * 0.03} />)}
-        </ul>
-      )}
+      {/* Always rendered so it can grow and shrink smoothly: the row height animates between 0fr and 1fr. */}
+      <div
+        className="grid transition-[grid-template-rows,opacity] duration-[380ms] ease-[cubic-bezier(0.4,0,0.2,1)] motion-reduce:transition-none"
+        style={{
+          gridTemplateRows: all ? "1fr" : "0fr",
+          opacity: all ? 1 : 0,
+          visibility: all ? "visible" : "hidden",
+          // visibility stays "visible" for the whole transition, then flips, so it leaves the tab order once shut
+          transitionProperty: "grid-template-rows, opacity, visibility",
+        }}
+        aria-hidden={!all}
+      >
+        <div className="overflow-hidden">
+          <ul id="badges-rest" className="grid grid-cols-3 gap-2.5 pb-0.5">
+            {rest.map((b) => <Tile key={b.id} badge={b} earned={have.has(b.id)} onOpen={() => setOpen(b)} delay={0} plain />)}
+          </ul>
+        </div>
+      </div>
       <button
         type="button"
         onClick={() => setAll((v) => !v)}
