@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getStation } from "@/lib/data";
 import { getRestaurant, lines, LINE_ORDER, restaurantsIn } from "@/lib/geo";
+import PointsChip from "@/components/restaurant/PointsChip";
 import { POINTS } from "@/lib/scoring";
 import CheckinPanel from "@/components/restaurant/CheckinPanel";
 import GetThereCard from "@/components/restaurant/GetThereCard";
@@ -48,6 +49,7 @@ export default function RestaurantPage({ params }: { params: { id: string } }) {
               </span>
             </li>
             {!r.isChain && <li className={`${pill} bg-signal text-ink`}>Independent +{POINTS.independent}</li>}
+            <PointsChip neighborhood={r.neighborhood} nearestStopId={r.nearestStopId} isChain={r.isChain} lines={r.nearestStation.lines} />
           </ul>
         </header>
 

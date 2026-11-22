@@ -25,6 +25,8 @@ export type FlyTarget =
 
 interface Props {
   restaurants: Restaurant[];
+  /** point multiplier for this player, for the spots worth more than usual (restaurant id to 1.5 or 2) */
+  boosts?: Map<string, number> | null;
   places: MapPlace[];
   selectedPlaceId: string | null;
   onSelectPlace: (p: MapPlace) => void;
@@ -297,8 +299,11 @@ function PlacePins({
   );
 }
 
-function pinIcon(state: PinState, selected: boolean, base: number): L.DivIcon {
-  const size = selected ? base + 6 : base;
+/** A spot worth more to you: a little bigger, with a ×1.5 or ×2 tag. */
+const boostTier = (boost: number | undefined) => (boost && boost >= 2 ? 2 : boost && boost > 1 ? 1 : 0);
+
+function pinIcon(state: PinState, selected: boolean, base: number, tier = 0): L.DivIcon {
+  const size = (selected ? base + 6 : base) + tier * 3;
   const glyphPx = Math.max(7, Math.round(size * 0.55));
   const glyph =
     state === "visited"
@@ -309,7 +314,11 @@ function pinIcon(state: PinState, selected: boolean, base: number): L.DivIcon {
   const ring = selected ? `box-shadow:0 0 0 3px #fff,0 0 0 6px ${LINE_COLORS.blue};` : "box-shadow:0 2px 4px rgba(0,0,0,.25);";
   return L.divIcon({
     className: "food-pin",
-    html: `<span style="display:flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:999px;border:2px solid #000;background:${PIN_FILL[state]};box-sizing:border-box;${ring}">${glyph}</span>`,
+    html: `<span style="position:relative;display:flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:999px;border:2px solid #000;background:${PIN_FILL[state]};box-sizing:border-box;${ring}">${glyph}${
+      tier && size >= 16
+        ? `<span style="position:absolute;top:-9px;right:-13px;background:#000;color:#FFB81C;border-radius:999px;padding:2px 5px;font:900 10px/1 var(--font-inter),sans-serif">×${tier === 2 ? "2" : "1.5"}</span>`
+        : ""
+    }</span>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   });
@@ -320,6 +329,7 @@ function FoodPins({
   unlocked,
   visited,
   selectedId,
+  boosts,
   renderer,
   onSelect,
 }: {
@@ -327,6 +337,7 @@ function FoodPins({
   unlocked: Set<string>;
   visited: Set<string>;
   selectedId: string | null;
+  boosts?: Map<string, number> | null;
   renderer: L.Renderer;
   onSelect: (r: Restaurant) => void;
 }) {
@@ -335,10 +346,11 @@ function FoodPins({
   const pinPx = Math.round(22 * scale);
   const icons = useMemo(() => {
     const m = new Map<string, L.DivIcon>();
-    for (const s of ["visited", "fog", "clear"] as PinState[]) {
-      m.set(`${s}-0`, pinIcon(s, false, pinPx));
-      m.set(`${s}-1`, pinIcon(s, true, pinPx));
-    }
+    for (const s of ["visited", "fog", "clear"] as PinState[])
+      for (const tier of [0, 1, 2]) {
+        m.set(`${s}-0-${tier}`, pinIcon(s, false, pinPx, tier));
+        m.set(`${s}-1-${tier}`, pinIcon(s, true, pinPx, tier));
+      }
     return m;
   }, [pinPx]);
 
@@ -357,7 +369,7 @@ function FoodPins({
               <Marker
                 key={r.id}
                 position={[r.lat, r.lng]}
-                icon={icons.get(`${pinState(r, unlocked, visited)}-${sel ? 1 : 0}`)!}
+                icon={icons.get(`${pinState(r, unlocked, visited)}-${sel ? 1 : 0}-${boostTier(boosts?.get(r.id))}`)!}
                 title={r.name}
                 zIndexOffset={sel ? 1000 : 0}
                 eventHandlers={{ click: () => onSelect(r) }}
@@ -378,7 +390,7 @@ function FoodPins({
           <CircleMarker
             key={r.id}
             center={[r.lat, r.lng]}
-            radius={sel ? radius + 4 : radius}
+            radius={(sel ? radius + 4 : radius) + boostTier(boosts?.get(r.id))}
             pathOptions={{
               renderer,
               color: sel ? LINE_COLORS.blue : INK,
@@ -401,6 +413,7 @@ function FoodPins({
 
 export default function FogMap({
   restaurants,
+  boosts,
   places,
   selectedPlaceId,
   onSelectPlace,
@@ -499,6 +512,7 @@ export default function FogMap({
           unlocked={unlocked}
           visited={visited}
           selectedId={selectedId}
+          boosts={boosts}
           renderer={renderers.food}
           onSelect={onSelectRestaurant}
         />

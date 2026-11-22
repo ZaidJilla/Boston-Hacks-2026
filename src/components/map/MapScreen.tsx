@@ -30,7 +30,9 @@ import FogMap, { boundsFor, type FlyTarget } from "./FogMap";
 import FilterSheet, { type FilterSection } from "./FilterSheet";
 import PeekCard from "./PeekCard";
 import PlaceCard from "./PlaceCard";
+import { reasonText } from "@/components/restaurant/PointsChip";
 import { useUnlocked } from "./useUnlocked";
+import { previewFor, usePointsContext } from "./usePointsPreview";
 import { useRankUp } from "./useRankUp";
 import RankBadge from "@/components/rank/RankBadge";
 import RankUpScreen from "@/components/rank/RankUpScreen";
@@ -231,6 +233,23 @@ export default function MapScreen() {
     return [...pool].sort((a, b) => score(a) - score(b))[0] ?? null;
   }, [selected, hoodInfo, visible, userPos, checkins, unlocked]);
 
+  // What a check-in would earn this player: shown on the peek card, and spots worth more get a tag on the map.
+  const pointsCtx = usePointsContext();
+  const peekPoints = useMemo(() => {
+    if (!pointsCtx || !pick) return undefined;
+    const p = previewFor(pointsCtx, pick);
+    return { total: p.total, why: reasonText(p) };
+  }, [pointsCtx, pick]);
+  const boosts = useMemo(() => {
+    if (!pointsCtx) return null;
+    const m = new Map<string, number>();
+    for (const r of visible) {
+      const p = previewFor(pointsCtx, r);
+      if (p.multiplier > 1) m.set(r.id, p.multiplier);
+    }
+    return m;
+  }, [pointsCtx, visible]);
+
   const pickHood = pick ? neighborhoodById.get(pick.neighborhood) : null;
   const eaten = pick ? restaurantsIn(pick.neighborhood).filter((r) => checkins.has(r.id)).length : 0;
   const tappedHoodName = hoodInfo ? neighborhoodById.get(hoodInfo)?.properties.name : null;
@@ -310,6 +329,7 @@ export default function MapScreen() {
 
       <FogMap
         restaurants={visible}
+        boosts={boosts}
         places={visiblePlaces}
         selectedPlaceId={selectedPlace?.id ?? null}
         onSelectPlace={(p) => {
@@ -363,6 +383,7 @@ export default function MapScreen() {
               hoodName={pickHood.properties.name}
               unlocked={unlocked.has(pick.neighborhood)}
               eaten={eaten}
+              points={peekPoints}
             />
           ) : (
             <div className="rounded-card bg-white p-4 shadow-card">
