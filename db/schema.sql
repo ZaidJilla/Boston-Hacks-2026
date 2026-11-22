@@ -13,6 +13,10 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX IF NOT EXISTS users_points_idx ON users (points DESC);
 CREATE INDEX IF NOT EXISTS users_college_points_idx ON users (college, points DESC);
 
+ALTER TABLE users ADD COLUMN IF NOT EXISTS home_neighborhood     text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS home_station_id      text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS home_changed_season  text;
+
 -- Time-series of check-ins. Hypertable partitioned on created_at.
 CREATE TABLE IF NOT EXISTS checkins (
   id              bigserial,
@@ -23,7 +27,6 @@ CREATE TABLE IF NOT EXISTS checkins (
   lat             double precision NOT NULL,
   lng             double precision NOT NULL,
   verified        boolean NOT NULL DEFAULT false,
-  tx_signature    text,
   created_at      timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (id, created_at)
 );
@@ -40,7 +43,6 @@ CREATE TABLE IF NOT EXISTS first_visits (
 CREATE TABLE IF NOT EXISTS unlocks (
   uid          text NOT NULL REFERENCES users(uid),
   neighborhood text NOT NULL,
-  badge_mint   text,
   created_at   timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (uid, neighborhood)
 );

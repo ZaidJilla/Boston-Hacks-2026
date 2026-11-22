@@ -23,8 +23,3 @@ export const demoVerdict: ReceiptVerdict = {
   datedToday: true,
   reason: "Demo mode",
 };
-
-const B58 = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-const fake = (n: number) => Array.from({ length: n }, () => B58[Math.floor(Math.random() * B58.length)]).join("");
-export const demoTxSignature = () => fake(88);
-export const demoBadgeMint = () => fake(44);

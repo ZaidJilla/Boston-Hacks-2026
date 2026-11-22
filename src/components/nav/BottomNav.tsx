@@ -2,11 +2,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LINE_COLORS } from "@/lib/config";
-import { ChatIcon, MapIcon, PersonIcon, TrophyIcon } from "@/components/signage/Icons";
+import { ChatIcon, MapIcon, PersonIcon, PlanIcon, TrophyIcon } from "@/components/signage/Icons";
 
 // Each tab owns a line color, shown as a bar on top of the active tab.
 const TABS = [
   { href: "/", label: "Map", Icon: MapIcon, color: LINE_COLORS.green },
+  { href: "/plan", label: "Plan", Icon: PlanIcon, color: LINE_COLORS.silver },
   { href: "/concierge", label: "Concierge", Icon: ChatIcon, color: LINE_COLORS.blue },
   { href: "/leaderboard", label: "Leaderboard", Icon: TrophyIcon, color: LINE_COLORS.orange },
   { href: "/profile", label: "Profile", Icon: PersonIcon, color: LINE_COLORS.red },

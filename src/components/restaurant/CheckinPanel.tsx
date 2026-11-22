@@ -119,16 +119,6 @@ export default function CheckinPanel({
             <span className="shrink-0 text-[20px] font-black text-signal">+{result.pointsEarned}</span>
           </div>
         )}
-        {result?.txSignature && !DEMO_MODE && (
-          <a
-            className="hit-44 inline-block text-[14px] font-bold text-line-blue underline underline-offset-2"
-            target="_blank"
-            rel="noreferrer"
-            href={`https://explorer.solana.com/tx/${result.txSignature}?cluster=devnet`}
-          >
-            View check-in on Solana
-          </a>
-        )}
         {result?.unlockedNeighborhood && !showUnlock && (
           <button
             type="button"

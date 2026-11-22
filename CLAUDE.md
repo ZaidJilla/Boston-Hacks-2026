@@ -8,7 +8,7 @@ A mobile-first web app for BostonHacks 2026 (due **9:00 AM Sunday Nov 22**, judg
 
 Boston is split into neighborhoods covered in fog. You unlock a neighborhood by eating at **3 restaurants** in it. Unlocking feeds a ranked system with three leaderboards: citywide, by college, and per neighborhood. Getting around uses the T, so transit is built into every screen.
 
-Working name: **[NAME]** (rename once we claim the domain).
+Name: **ChewChoo**. Domain: **chewchoo.co**.
 
 ## Who it's for
 
@@ -18,7 +18,6 @@ College students in Boston without a car who stay in their campus bubble. The ga
 
 - **Main track: Bos(tons) of Eats and Streets.** Must be a web app, must use Boston transit, must filter by craving, budget, and location.
 - **Best Use of Gemini API:** receipt verification (vision) plus the craving concierge, both on Gemini.
-- **Best Use of Solana:** NFT badge minted on neighborhood unlock, check-ins written on-chain (devnet).
 - **Best Use of Tiger Data:** all game data lives in Tiger Data (Postgres + TimescaleDB). Check-ins are a hypertable; leaderboards are SQL.
 - **Best Use of Mastra:** the craving concierge agent (and the check-in workflow) built with the Mastra TypeScript framework.
 - **Best Use of Vultr:** the app runs in Docker on a Vultr instance.
@@ -38,7 +37,6 @@ Judging criteria: impact, user fit, technical implementation, design, presentati
 - Turf.js for point-in-polygon and distances
 - Gemini via `@google/genai` (server-side only)
 - **Mastra** (`@mastra/core`, `@ai-sdk/google`, `zod`) for the concierge agent, with Gemini as the model
-- **Solana devnet** via `@solana/web3.js` and `@solana/spl-token` (server-side only). Badges are 0-decimal, supply-1 SPL mints; check-ins use the Memo program. Ask before adding Metaplex.
 - MBTA GTFS static (`https://cdn.mbta.com/MBTA_GTFS.zip`) parsed at build time by scripts
 - MBTA V3 API (`https://api-v3.mbta.com`) for live predictions
 - **Trip planner:** our own, in `src/lib/planner.ts`. Dijkstra over `data/graph.json` (built from MBTA GTFS by `scripts/graph.ts`: subway, light rail, bus, Silver Line), with live waits from MBTA predictions and live alerts. Free, no billing. Google Routes API is an optional fallback only.
@@ -56,7 +54,7 @@ docs/               DEV post draft, pitch script, sponsor notes
 src/app/            Pages and API routes (App Router)
   page.tsx          The map (home)
   leaderboard/      Citywide / college / neighborhood tabs
-  profile/          Unlocked neighborhoods, badges, line quests, CO2 saved
+  profile/          Unlocked neighborhoods, line quests, CO2 saved
   restaurant/[id]/  Detail, nearest station, live arrivals, "Get there", check-in
   concierge/        Chat with the craving concierge agent
   api/checkin/      Verify location + receipt, write check-in, handle unlocks
@@ -66,7 +64,6 @@ src/app/            Pages and API routes (App Router)
 src/components/     UI components
 src/lib/            Shared logic. Keep game rules in scoring.ts, nothing hardcoded in components.
   db.ts             Tiger Data pool (null without DATABASE_URL)
-  solana.ts         mintBadge, logCheckin
   agent.ts          Mastra agent and tools
 ```
 
@@ -84,9 +81,9 @@ src/lib/            Shared logic. Keep game rules in scoring.ts, nothing hardcod
 
 ```
 users         uid PK, display_name, email, college, points, co2_saved_kg, created_at
-checkins      id, uid, restaurant_id, neighborhood, nearest_stop_id, lat, lng, verified, tx_signature, created_at   (hypertable on created_at)
+checkins      id, uid, restaurant_id, neighborhood, nearest_stop_id, lat, lng, verified, created_at   (hypertable on created_at)
 first_visits  (uid, restaurant_id) PK. Enforces one counted check-in per restaurant per user.
-unlocks       (uid, neighborhood) PK, badge_mint, created_at
+unlocks       (uid, neighborhood) PK, created_at
 quests        (uid, line) PK, stop_ids text[], completed
 ```
 
@@ -98,14 +95,14 @@ Leaderboards are SQL: citywide and college query `users` by `points`; per-neighb
 - Shows a "Simulate check-in" button that skips location and receipt checks.
 - Seeds ~40 fake users across BU, Northeastern, Tufts, MIT, Harvard, Emerson (`npm run data:seed`).
 - Without `DATABASE_URL`, the server uses the in-memory store in `src/lib/store.ts`.
-- Any external call (Gemini, Mastra, Solana, Google Routes, MBTA, Tiger Data) falls back to a canned response instead of throwing.
+- Any external call (Gemini, Mastra, Google Routes, MBTA, Tiger Data) falls back to a canned response instead of throwing.
 
-The live pitch is 3 minutes. Every feature must be demoable without walking anywhere. Before judging, run the demo once with real keys (Tiger Data, Gemini, Solana devnet) so the sponsor integrations are shown live.
+The live pitch is 3 minutes. Every feature must be demoable without walking anywhere. Before judging, run the demo once with real keys (Tiger Data, Gemini) so the sponsor integrations are shown live.
 
 ## Rules
 
 - Never commit secrets. Keys live in `.env.local`; keep `.env.example` updated when adding one.
-- All Gemini, Mastra, Solana, Tiger Data, and Firebase Admin calls happen in API routes or server code, never in the browser.
+- All Gemini, Mastra, Tiger Data, and Firebase Admin calls happen in API routes or server code, never in the browser.
 - The repo is public (Devpost requires it).
 - Small focused commits. One feature per branch.
 - Prefer finishing and polishing over starting new features. After ~5 AM, only fix bugs and polish.
@@ -130,6 +127,5 @@ npm run data:gtfs        Parse MBTA GTFS into stations, lines, travel times
 npm run data:food        Pull restaurants from OpenStreetMap and tag them
 npm run data:seed        Seed demo users into Tiger Data
 npm run db:migrate       Apply db/schema.sql to Tiger Data
-npm run solana:setup     Fund a devnet wallet and create the badge collection
 npm run build            Production build
 ```
