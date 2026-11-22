@@ -6,7 +6,7 @@ import { getPlaceDetails } from "@/lib/places";
 import PhotoGallery, { PhotoPlaceholder } from "./PhotoGallery";
 
 export function PhotosSkeleton() {
-  return <div className="aspect-[16/9] w-full animate-pulse rounded-2xl bg-fog/60" aria-busy="true" aria-label="Loading photos" />;
+  return <div className="aspect-[16/9] w-full animate-pulse rounded-card bg-panel" aria-busy="true" aria-label="Loading photos" />;
 }
 
 export async function RestaurantPhotos({ r }: { r: Restaurant }) {
@@ -56,8 +56,8 @@ const linkClass = "font-medium text-line-blue underline underline-offset-2 break
 
 export function DetailsSkeleton() {
   return (
-    <div className="space-y-3 rounded-lg bg-white p-3" aria-busy="true" aria-label="Loading details">
-      {[0, 1, 2].map((i) => <div key={i} className="h-4 animate-pulse rounded bg-fog/60" style={{ width: `${80 - i * 15}%` }} />)}
+    <div className="space-y-3 rounded-card bg-panel p-3" aria-busy="true" aria-label="Loading details">
+      {[0, 1, 2].map((i) => <div key={i} className="h-4 animate-pulse rounded bg-panel" style={{ width: `${80 - i * 15}%` }} />)}
     </div>
   );
 }
@@ -85,14 +85,14 @@ export async function RestaurantDetails({ r }: { r: Restaurant }) {
               <span className="font-semibold">{d.rating.toFixed(1)}</span>
               <span aria-hidden="true" className="text-line-orange"> ★</span>
               {d.ratingCount !== undefined && (
-                <span className="text-ink/60"> ({d.ratingCount.toLocaleString("en-US")} on Google)</span>
+                <span className="text-muted"> ({d.ratingCount.toLocaleString("en-US")} on Google)</span>
               )}
             </span>
           )}
           {d.openNow !== undefined && (
             <span
               className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                d.openNow ? "bg-line-green/10 text-line-green" : "bg-line-red/10 text-line-red"
+                d.openNow ? "bg-line-green text-white" : "bg-line-red text-white"
               }`}
             >
               {d.openNow ? "Open now" : "Closed now"}
@@ -101,11 +101,11 @@ export async function RestaurantDetails({ r }: { r: Restaurant }) {
         </p>
       )}
 
-      {d.summary && <p className="text-sm leading-relaxed text-ink/80">{d.summary}</p>}
+      {d.summary && <p className="text-[15px] leading-relaxed text-ink">{d.summary}</p>}
 
-      <section className="rounded-lg bg-white px-3 py-1" aria-labelledby="info-h">
+      <section className="rounded-card bg-panel px-3 py-1" aria-labelledby="info-h">
         <h2 id="info-h" className="sr-only">Details</h2>
-        <dl className="divide-y divide-ink/10">
+        <dl className="divide-y divide-hairline">
           <Row icon="📍" label="Address">
             <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className={linkClass}>
               {r.address ? `${r.address}, ${r.neighborhoodName}` : `Open in Google Maps`}
@@ -136,7 +136,7 @@ export async function RestaurantDetails({ r }: { r: Restaurant }) {
       {tags.length > 0 && (
         <ul className="flex flex-wrap gap-1.5" aria-label="Good to know">
           {tags.map((t) => (
-            <li key={t} className="rounded-full bg-white px-2.5 py-1 text-xs font-medium text-ink/80 ring-1 ring-ink/10">{t}</li>
+            <li key={t} className="rounded-full bg-panel px-3 py-1.5 text-[13px] font-bold text-ink">{t}</li>
           ))}
         </ul>
       )}

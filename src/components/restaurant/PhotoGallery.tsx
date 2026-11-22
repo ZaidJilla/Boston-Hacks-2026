@@ -6,7 +6,7 @@ import type { PlacePhoto } from "@/lib/places";
 export function PhotoPlaceholder({ emoji, label }: { emoji?: string; label: string }) {
   return (
     <div
-      className="flex aspect-[16/9] w-full items-center justify-center rounded-2xl bg-fog/60 text-6xl"
+      className="flex aspect-[16/9] w-full items-center justify-center rounded-card bg-panel text-6xl"
       role="img"
       aria-label={label}
     >
@@ -38,7 +38,7 @@ export default function PhotoGallery({
   return (
     <figure className="space-y-1.5">
       <div
-        className="flex snap-x snap-mandatory gap-2 overflow-x-auto rounded-2xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="flex snap-x snap-mandatory gap-2 overflow-x-auto rounded-card [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         aria-label={`Photos of ${name}`}
         role="region"
         tabIndex={many ? 0 : undefined}
@@ -48,7 +48,7 @@ export default function PhotoGallery({
         }}
       >
         {shown.map((p, i) => (
-          <div key={p.url} className="relative aspect-[16/9] w-full shrink-0 snap-center overflow-hidden rounded-2xl bg-fog/60">
+          <div key={p.url} className="relative aspect-[16/9] w-full shrink-0 snap-center overflow-hidden rounded-card bg-panel">
             {/* eslint-disable-next-line @next/next/no-img-element -- remote hosts vary per restaurant */}
             <img
               src={p.url}
@@ -61,7 +61,7 @@ export default function PhotoGallery({
           </div>
         ))}
       </div>
-      <figcaption className="flex items-center justify-between gap-2 text-xs text-ink/60">
+      <figcaption className="flex items-center justify-between gap-2 text-xs text-muted">
         <span className="min-w-0 truncate">
           {source === "google" ? (
             <>

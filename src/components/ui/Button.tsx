@@ -17,7 +17,8 @@ export default function Button({
   className = "",
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: ButtonVariant }) {
-  return <button type="button" className={`${buttonClass(variant)} ${className}`} {...props} />;
+  // No default `type`: inside a form this stays a submit button, as before.
+  return <button className={`${buttonClass(variant)} ${className}`} {...props} />;
 }
 
 /** Outline chip: 36px visual, 44px tap area. Selected = black fill (or amber with `accent`). */

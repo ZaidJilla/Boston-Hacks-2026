@@ -250,10 +250,10 @@ export default function FilterSheet({
         </div>
 
         <div className="flex gap-2.5 border-t-2 border-ink bg-white px-5 py-3">
-          <button type="button" onClick={() => onChange(DEFAULT_FILTERS)} className={`${buttonClass("outline")} flex-1 px-3`}>
+          <button type="button" onClick={() => onChange(DEFAULT_FILTERS)} className={`${buttonClass("outline")} flex-1 !px-3`}>
             Reset
           </button>
-          <button type="button" onClick={onClose} className={`${buttonClass("primary")} flex-[2] px-3`}>
+          <button type="button" onClick={onClose} className={`${buttonClass("primary")} flex-[2] !px-3`}>
             Show {resultCount} {resultCount === 1 ? "spot" : "spots"}
           </button>
         </div>
