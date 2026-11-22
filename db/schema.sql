@@ -13,6 +13,10 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX IF NOT EXISTS users_points_idx ON users (points DESC);
 CREATE INDEX IF NOT EXISTS users_college_points_idx ON users (college, points DESC);
 
+ALTER TABLE users ADD COLUMN IF NOT EXISTS home_neighborhood     text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS home_station_id      text;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS home_changed_season  text;
+
 -- Time-series of check-ins. Hypertable partitioned on created_at.
 CREATE TABLE IF NOT EXISTS checkins (
   id              bigserial,

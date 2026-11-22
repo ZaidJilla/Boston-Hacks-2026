@@ -72,6 +72,12 @@ export interface UserDoc {
   unlocked: string[];
   co2SavedKg: number;
   createdAt: number;
+  /** Neighborhood.id the user calls home. Set during onboarding. */
+  homeNeighborhood?: string;
+  /** Nearest subway Station.id to that neighborhood's center. Scoring measures stops from here. */
+  homeStationId?: string;
+  /** Season label of the last home change (see seasonOf in scoring.ts). First set doesn't count. */
+  homeChangedSeason?: string;
 }
 
 export interface CheckinDoc {
@@ -152,4 +158,17 @@ export interface LeaderboardRow {
   name: string;
   college?: string;
   points: number;
+}
+
+export interface HomeState {
+  neighborhood: string | null;
+  stationId: string | null;
+  /** False once the user has used their one change this season. */
+  canChange: boolean;
+  season: string;
+}
+
+export interface HomeResult extends HomeState {
+  ok: boolean;
+  error?: string;
 }
