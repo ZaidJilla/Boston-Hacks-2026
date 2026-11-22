@@ -10,6 +10,7 @@ import type { LineId, RouteResult, RouteStep } from "./types";
 
 type LatLng = { lat: number; lng: number };
 const WALK_M_PER_MIN = 80;
+const MAX_WALK_ONLY_MIN = 40; // never suggest walking longer than this when a transit route exists
 
 function lineFromName(name: string | undefined): LineId | undefined {
   const n = (name ?? "").toLowerCase();
@@ -63,14 +64,14 @@ async function gtfsRoute(o: LatLng, dest: LatLng): Promise<RouteResult | null> {
 
   const p = plan(o, dest);
   if (!p) return null;
-  if (walkMin <= p.durationMin) return walkOnly;
+  if (walkMin <= p.durationMin && walkMin <= MAX_WALK_ONLY_MIN) return walkOnly;
   const steps = p.steps.map((s) => ({ ...s }));
   let duration = p.durationMin;
 
   // Swap the planned wait for the live one on the first ride.
   const fb = p.firstBoard;
   const [live, alerts] = await Promise.all([
-    fb ? getNextDeparture(fb.stopId, fb.routeId) : Promise.resolve(null),
+    fb ? getNextDeparture(fb.stopId, fb.routeId, fb.toStopId) : Promise.resolve(null),
     getAlerts(p.routeIds, p.stopIds),
   ]);
   if (fb && live !== null) {

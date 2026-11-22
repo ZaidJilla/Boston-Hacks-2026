@@ -2,12 +2,17 @@
 
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
+import { Chip } from "@/components/ui/Button";
 import { APP_NAME, BOSTON_CENTER } from "@/lib/config";
 import {
+  activeFilterCount,
   cravingById,
   DEFAULT_FILTERS,
   distanceM,
+  filterPlaces,
   filterRestaurants,
+  MAP_LAYERS,
+  mapPlaces,
   LINE_ORDER,
   lineColor,
   neighborhoodAt,
@@ -15,6 +20,8 @@ import {
   neighborhoods,
   restaurants,
   restaurantsIn,
+  type MapLayer,
+  type MapPlace,
   type Restaurant,
   type RestaurantFilters,
 } from "@/lib/geo";
@@ -23,6 +30,7 @@ import { ChevronDownIcon, LocateIcon } from "@/components/signage/Icons";
 import FogMap, { boundsFor, type FlyTarget } from "./FogMap";
 import FilterSheet, { type FilterSection } from "./FilterSheet";
 import PeekCard from "./PeekCard";
+import PlaceCard from "./PlaceCard";
 import { useUnlocked } from "./useUnlocked";
 
 const TOTAL_HOODS = neighborhoods.features.length;
@@ -96,17 +104,49 @@ export default function MapScreen() {
   const [filters, setFilters] = useState<RestaurantFilters>(DEFAULT_FILTERS);
   const [sheet, setSheet] = useState<FilterSection | null>(null);
   const [selected, setSelected] = useState<Restaurant | null>(null);
+  const [selectedPlace, setSelectedPlace] = useState<MapPlace | null>(null);
+  const [layers, setLayers] = useState<Set<MapLayer>>(new Set(["food", "landmark", "shopping"]));
   const [hoodInfo, setHoodInfo] = useState<string | null>(null);
   const [flyTo, setFlyTo] = useState<FlyTarget>(null);
   const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
   const [locating, setLocating] = useState(false);
   const [locateError, setLocateError] = useState<string | null>(null);
 
-  const visible = useMemo(() => filterRestaurants(restaurants, filters), [filters]);
+  // Default view is the neighborhoods and a few famous landmarks. Every restaurant, shop and smaller
+  // landmark appears once a neighborhood is opened or a filter is set.
+  const focused = activeFilterCount(filters) > 0;
+  const visible = useMemo(
+    () => (focused && layers.has("food") ? filterRestaurants(restaurants, filters) : []),
+    [focused, filters, layers],
+  );
+  // A dozen iconic landmarks stay on the map everywhere, even while one neighborhood is open: seeing
+  // them is what pulls people toward somewhere new. Everything else shows once a neighborhood opens.
+  const visiblePlaces = useMemo(() => {
+    const all = mapPlaces.filter((p) => p.type !== "store");
+    const iconic = all.filter((p) => p.iconic);
+    if (!focused) return iconic;
+    const rest = filterPlaces(
+      all.filter((p) => !p.iconic && layers.has(p.type === "landmark" ? "landmark" : "shopping")),
+      filters,
+    );
+    return [...iconic, ...rest];
+  }, [focused, filters, layers]);
+
+  const toggleLayer = useCallback((id: MapLayer) => {
+    setLayers((cur) => {
+      const next = new Set(cur);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    setSelected(null);
+    setSelectedPlace(null);
+  }, []);
 
   const changeFilters = useCallback((f: RestaurantFilters) => {
     setFilters(f);
     setSelected(null);
+    setSelectedPlace(null);
     if (f.location.kind === "neighborhood") {
       const b = boundsFor(f.location.id);
       if (b) setFlyTo({ kind: "bounds", bounds: b });
@@ -144,14 +184,25 @@ export default function MapScreen() {
     if (pos) setFlyTo({ kind: "point", lat: pos.lat, lng: pos.lng, zoom: 15 });
   }, [findMe]);
 
+  // Tapping a neighborhood opens it: fly there and show every spot inside.
   const selectHood = useCallback((id: string) => {
     setHoodInfo(id);
     setSelected(null);
+    setSelectedPlace(null);
+    setFilters((prev) => ({ ...prev, location: { kind: "neighborhood", id } }));
+    const b = boundsFor(id);
+    if (b) setFlyTo({ kind: "bounds", bounds: b });
   }, []);
   const clearSelection = useCallback(() => {
     setSelected(null);
+    setSelectedPlace(null);
     setHoodInfo(null);
   }, []);
+  const backToAll = useCallback(() => {
+    changeFilters(DEFAULT_FILTERS);
+    setHoodInfo(null);
+    setFlyTo({ kind: "point", lat: BOSTON_CENTER[0], lng: BOSTON_CENTER[1], zoom: 13 });
+  }, [changeFilters]);
   const closeSheet = useCallback(() => setSheet(null), []);
 
   // The peek card: the tapped spot, else the best spot in the tapped neighborhood, else the
@@ -229,12 +280,32 @@ export default function MapScreen() {
               <span className="truncate">T line</span>
             </FilterPill>
           </div>
+
+          {focused && (
+            <div className="flex gap-2 overflow-x-auto" role="group" aria-label="Show on map">
+              <Chip onClick={backToAll} aria-pressed={undefined} aria-label="Back to all of Boston" className="!px-3">
+                ✕
+              </Chip>
+              {MAP_LAYERS.map((l) => (
+                <Chip key={l.id} selected={layers.has(l.id)} accent onClick={() => toggleLayer(l.id)}>
+                  {l.label}
+                </Chip>
+              ))}
+            </div>
+          )}
         </div>
         <LineStripe />
       </header>
 
       <FogMap
         restaurants={visible}
+        places={visiblePlaces}
+        selectedPlaceId={selectedPlace?.id ?? null}
+        onSelectPlace={(p) => {
+          setSelectedPlace(p);
+          setSelected(null);
+          setHoodInfo(null);
+        }}
         unlocked={unlocked}
         visited={checkins}
         selectedId={selected?.id ?? null}
@@ -242,6 +313,7 @@ export default function MapScreen() {
         flyTo={flyTo}
         onSelectRestaurant={(r) => {
           setSelected(r);
+          setSelectedPlace(null);
           setHoodInfo(null);
         }}
         onSelectNeighborhood={selectHood}
@@ -263,7 +335,18 @@ export default function MapScreen() {
           </p>
         )}
         <div className="pointer-events-auto w-full">
-          {pick && pickHood ? (
+          {selectedPlace ? (
+            <PlaceCard
+              p={selectedPlace}
+              unlocked={unlocked.has(selectedPlace.neighborhood)}
+              onClose={() => setSelectedPlace(null)}
+            />
+          ) : !focused ? (
+            <div className="rounded-card bg-white p-4 shadow-card">
+              <p className="text-[18px] font-black tracking-[-0.5px]">Tap a neighborhood</p>
+              <p className="text-[14px] text-muted">See every spot inside it. Tap a landmark to learn more.</p>
+            </div>
+          ) : pick && pickHood ? (
             <PeekCard
               r={pick}
               hoodName={pickHood.properties.name}
@@ -294,7 +377,7 @@ export default function MapScreen() {
         onClose={closeSheet}
         filters={filters}
         onChange={changeFilters}
-        resultCount={visible.length}
+        resultCount={visible.length + visiblePlaces.length}
         unlocked={unlocked}
         onNearMe={nearMe}
         locating={locating}

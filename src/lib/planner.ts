@@ -58,10 +58,13 @@ const walkMin = (meters: number) => (meters * DETOUR) / WALK_M_PER_MIN;
 
 function near(L: Loaded, lat: number, lng: number, maxM: number, limit: number) {
   const cy = Math.floor(lat / CELL), cx = Math.floor(lng / CELL);
-  const reach = Math.ceil(maxM / 400);
+  // Cells are fixed in degrees, so a longitude cell is narrower than a latitude cell.
+  const cellLatM = CELL * 111_320;
+  const reachY = Math.ceil(maxM / cellLatM);
+  const reachX = Math.ceil(maxM / (cellLatM * Math.cos((lat * Math.PI) / 180)));
   const found: { i: number; m: number }[] = [];
-  for (let dy = -reach; dy <= reach; dy++)
-    for (let dx = -reach; dx <= reach; dx++)
+  for (let dy = -reachY; dy <= reachY; dy++)
+    for (let dx = -reachX; dx <= reachX; dx++)
       for (const i of L.grid.get(`${cy + dy},${cx + dx}`) ?? []) {
         const m = distanceMeters(lat, lng, L.g.nodes[i][1], L.g.nodes[i][2]);
         if (m <= maxM && L.routesAt[i].length) found.push({ i, m });
@@ -100,7 +103,7 @@ export interface Plan {
   /** Every stop id the rider boards, passes, or exits at (stations plus their platform ids). */
   stopIds: string[];
   /** First ride, so live predictions can replace the planned wait. */
-  firstBoard?: { stopId: string; routeId: string; plannedWaitMin: number; stepIndex: number };
+  firstBoard?: { stopId: string; toStopId: string; routeId: string; plannedWaitMin: number; stepIndex: number };
 }
 
 type Prev = { from: number; kind: "start" | "board" | "ride" | "alight" | "walk"; min: number };
@@ -192,7 +195,7 @@ export function plan(
       routeIds.push(rt.id);
       if (!firstBoard) {
         const boardIdx = steps.length - 1;
-        firstBoard = { stopId: "", routeId: rt.id, plannedWaitMin: ride.wait, stepIndex: boardIdx };
+        firstBoard = { stopId: "", toStopId: g.nodes[Math.floor(id / (R + 1))][0], routeId: rt.id, plannedWaitMin: ride.wait, stepIndex: boardIdx };
       }
       ride = null;
     }

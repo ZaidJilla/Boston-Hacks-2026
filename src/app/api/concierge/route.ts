@@ -9,6 +9,8 @@ const WINDOW_MS = 60_000;
 const MAX_REQS = 10;
 const hits = new Map<string, number[]>();
 
+// Best-effort only: keyed on x-forwarded-for, which a caller can spoof unless a trusted proxy
+// overwrites it, and callers without it share one bucket. Fine for demo-quota protection.
 function throttled(ip: string) {
   const now = Date.now();
   const recent = (hits.get(ip) ?? []).filter((t) => now - t < WINDOW_MS);

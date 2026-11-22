@@ -25,6 +25,31 @@ export interface Restaurant {
   nearestStopId: string; // Station.id
 }
 
+/** Landmarks and local stores from data/places.json (restaurants stay in restaurants.json). */
+export interface PlaceRow {
+  id: string;
+  type: "landmark" | "shopping" | "store";
+  /** park, museum, attraction, gallery, historic-building; mall, district, market for shopping */
+  subtype: string;
+  name: string;
+  lat: number;
+  lng: number;
+  neighborhood: string; // Neighborhood.id
+  neighborhoodName: string;
+  isChain: boolean;
+  /** Shown on the map by default to draw people in. */
+  famous?: boolean;
+  /** One of the few shown on the map before a neighborhood is opened. */
+  iconic?: boolean;
+  /** Added by hand because OSM has no tagged entry for it. */
+  curated?: boolean;
+  address: string | null;
+  website: string | null;
+  openingHours: string | null;
+  wheelchair: string | null; // OSM value: yes | limited | no
+  nearestStopId: string; // Station.id
+}
+
 export interface Station {
   id: string;
   name: string;
@@ -59,14 +84,12 @@ export interface CheckinDoc {
   lat: number;
   lng: number;
   verified: boolean;
-  txSignature?: string;
   createdAt: number;
 }
 
 export interface UnlockDoc {
   uid: string;
   neighborhood: string;
-  badgeMint?: string;
   createdAt: number;
 }
 
@@ -92,10 +115,8 @@ export interface CheckinResult {
   pointsEarned: number;
   totalPoints: number;
   unlockedNeighborhood?: string;
-  badgeMint?: string;
   questCompleted?: LineId;
   co2SavedKg: number;
-  txSignature?: string;
 }
 
 export interface Arrival {
@@ -135,6 +156,19 @@ export interface LeaderboardRow {
   points: number;
 }
 
+export interface HomeState {
+  neighborhood: string | null;
+  stationId: string | null;
+  /** False once the user has used their one change this season. */
+  canChange: boolean;
+  season: string;
+}
+
+export interface HomeResult extends HomeState {
+  ok: boolean;
+  error?: string;
+}
+
 // GET /api/profile
 export interface NeighborhoodProgress {
   id: string;
@@ -142,7 +176,6 @@ export interface NeighborhoodProgress {
   visited: number; // distinct restaurants checked into
   needed: number; // UNLOCK_THRESHOLD
   unlocked: boolean;
-  badgeMint?: string; // Solana mint address, once unlocked
 }
 
 export interface QuestProgress {

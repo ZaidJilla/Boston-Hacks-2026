@@ -11,19 +11,18 @@
     "data:hoods": "tsx scripts/hoods.ts",
     "data:gtfs": "tsx scripts/gtfs.ts",
     "data:food": "tsx scripts/food.ts",
+    "data:places": "tsx scripts/places.ts",
     "data:seed": "tsx scripts/seed.ts",
     "db:migrate": "tsx scripts/migrate.ts",
-    "solana:setup": "tsx scripts/solana-setup.ts",
-    "data:all": "npm run data:hoods && npm run data:gtfs && npm run data:food",
+    "data:all": "npm run data:hoods && npm run data:gtfs && npm run data:food && npm run data:places",
     "data:graph": "tsx scripts/graph.ts",
-    "data:photos": "tsx scripts/photos.ts"
+    "data:photos": "tsx scripts/photos.ts",
+    "test:trip": "tsx scripts/test-trip.ts"
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.124",
     "@google/genai": "^1.0.0",
     "@mastra/core": "^1.85.0",
-    "@solana/spl-token": "^0.4.15",
-    "@solana/web3.js": "^1.99.0",
     "@turf/turf": "^7.2.0",
     "firebase": "^11.0.0",
     "firebase-admin": "^13.0.0",

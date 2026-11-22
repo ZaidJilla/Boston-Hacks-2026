@@ -22,7 +22,6 @@ A check-in is an event: who ate where, and when. Rows are only ever appended, an
 5. Merge the stop into each line quest's `text[]` and complete it at 5 stops.
 6. `UPDATE users SET points = points + $2, co2_saved_kg = co2_saved_kg + $3`.
 
-Solana minting happens only after the commit, so a slow chain never holds a database lock.
 
 ## Continuous aggregate
 

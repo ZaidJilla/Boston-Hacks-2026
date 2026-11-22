@@ -13,6 +13,7 @@ import {
   neighborhoodById,
   neighborhoods,
   stations,
+  type MapPlace,
   type NeighborhoodFeature,
   type Restaurant,
 } from "@/lib/geo";
@@ -24,6 +25,9 @@ export type FlyTarget =
 
 interface Props {
   restaurants: Restaurant[];
+  places: MapPlace[];
+  selectedPlaceId: string | null;
+  onSelectPlace: (p: MapPlace) => void;
   unlocked: Set<string>;
   visited: Set<string>;
   selectedId: string | null;
@@ -157,31 +161,134 @@ function HoodLabels({ unlocked }: { unlocked: Set<string> }) {
   if (zoom < 12) return null;
   return (
     <>
-      {neighborhoods.features.map((f) => (
-        <Marker
-          key={f.properties.id}
-          position={f.properties.center}
-          icon={icons.get(f.properties.id)!}
-          interactive={false}
-          keyboard={false}
-        />
-      ))}
+      {neighborhoods.features
+        // Tiny neighborhoods (Leather District, Bay Village, Chinatown...) pile their names on top of
+        // each other when zoomed out, so they get a label once there is room. Unlocked ones always do.
+        .filter((f) => zoom >= 14 || unlocked.has(f.properties.id) || (f.properties.sqmiles ?? 1) >= 0.6)
+        .map((f) => (
+          <Marker
+            key={f.properties.id}
+            position={f.properties.center}
+            icon={icons.get(f.properties.id)!}
+            interactive={false}
+            keyboard={false}
+          />
+        ))}
+    </>
+  );
+}
+
+// Landmarks are diamonds and shopping is a square, so each type reads at a glance next to the food
+// pins. Same colors as food: amber while the neighborhood is in fog, white once it is clear.
+/** Famous landmarks are drawn a little larger than other places. */
+const FAMOUS_EXTRA = 3;
+const placeIconCache = new Map<string, L.DivIcon>();
+function placeIcon(type: MapPlace["type"], state: "selected" | "clear" | "fog", size: number): L.DivIcon {
+  const key = `${type}|${state}|${size}`;
+  const hit = placeIconCache.get(key);
+  if (hit) return hit;
+  const fill = state === "selected" ? LINE_COLORS.blue : state === "clear" ? "#FFFFFF" : AMBER;
+  const stroke = state === "selected" ? "#FFFFFF" : INK;
+  const w = state === "selected" ? 2.5 : 2;
+  const shape =
+    type === "landmark"
+      ? `<polygon points="10,1.5 18.5,10 10,18.5 1.5,10" fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round"/>`
+      : `<rect x="3" y="3" width="14" height="14" rx="2.5" fill="${fill}" stroke="${stroke}" stroke-width="${w}"/>`;
+  const icon = L.divIcon({
+    className: "place-pin",
+    html: `<svg width="${size}" height="${size}" viewBox="0 0 20 20" aria-hidden="true" style="display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35))">${shape}</svg>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  });
+  placeIconCache.set(key, icon);
+  return icon;
+}
+
+function PlacePins({
+  places,
+  unlocked,
+  selectedId,
+  onSelect,
+}: {
+  places: MapPlace[];
+  unlocked: Set<string>;
+  selectedId: string | null;
+  onSelect: (p: MapPlace) => void;
+}) {
+  const map = useMap();
+  const { zoom, bounds } = useView();
+  const base = zoom <= 13 ? 11 : zoom <= 14 ? 13 : 16;
+
+  // Label a famous place only if its label doesn't land on one already placed, so downtown doesn't
+  // become a pile of overlapping names. Shorter names go first because they pack better.
+  const labelled = useMemo(() => {
+    const out = new Set<string>();
+    if (zoom < 14) return out;
+    const boxes: { x1: number; y1: number; x2: number; y2: number }[] = [];
+    const famous = places.filter((p) => p.famous && p.id !== selectedId).sort((a, b) => a.name.length - b.name.length);
+    for (const p of famous) {
+      const pt = map.latLngToContainerPoint([p.lat, p.lng]);
+      const w = p.name.length * 6 + 14;
+      const h = 20;
+      const top = pt.y - (base + FAMOUS_EXTRA) / 2 - h - 3;
+      const box = { x1: pt.x - w / 2, x2: pt.x + w / 2, y1: top, y2: top + h };
+      if (boxes.some((b) => box.x1 < b.x2 && box.x2 > b.x1 && box.y1 < b.y2 && box.y2 > b.y1)) continue;
+      boxes.push(box);
+      out.add(p.id);
+    }
+    return out;
+    // `bounds` changes after every pan or zoom, and label positions are screen-relative
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [places, zoom, bounds, selectedId, map, base]);
+
+  return (
+    <>
+      {places.map((p) => {
+        const size = p.famous ? base + FAMOUS_EXTRA : base;
+        const state = p.id === selectedId ? "selected" : unlocked.has(p.neighborhood) ? "clear" : "fog";
+        return (
+          <Marker
+            key={p.id}
+            position={[p.lat, p.lng]}
+            icon={placeIcon(p.type, state, size)}
+            title={p.name}
+            keyboard={false}
+            zIndexOffset={p.id === selectedId ? 1000 : p.famous ? 100 : 0}
+            eventHandlers={{
+              click: (e) => {
+                L.DomEvent.stopPropagation(e);
+                onSelect(p);
+              },
+            }}
+          >
+            <Tooltip
+              key={`${p.id}-${labelled.has(p.id)}`}
+              direction="top"
+              offset={[0, -size / 2]}
+              permanent={labelled.has(p.id)}
+              className={p.famous ? "famous-label" : undefined}
+            >
+              <span className="font-bold">{p.name}</span>
+            </Tooltip>
+          </Marker>
+        );
+      })}
     </>
   );
 }
 
 function pinIcon(state: PinState, selected: boolean): L.DivIcon {
-  const size = selected ? 34 : 26;
+  const size = selected ? 28 : 21;
   const glyph =
     state === "visited"
-      ? `<svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+      ? `<svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`
       : state === "fog"
-        ? `<span style="font:900 14px/1 var(--font-inter),sans-serif;color:#000">?</span>`
+        ? `<span style="font:900 12px/1 var(--font-inter),sans-serif;color:#000">?</span>`
         : "";
   const ring = selected ? `box-shadow:0 0 0 3px #fff,0 0 0 6px ${LINE_COLORS.blue};` : "box-shadow:0 2px 4px rgba(0,0,0,.25);";
   return L.divIcon({
     className: "food-pin",
-    html: `<span style="display:flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:999px;border:2.5px solid #000;background:${PIN_FILL[state]};box-sizing:border-box;${ring}">${glyph}</span>`,
+    html: `<span style="display:flex;align-items:center;justify-content:center;width:${size}px;height:${size}px;border-radius:999px;border:2px solid #000;background:${PIN_FILL[state]};box-sizing:border-box;${ring}">${glyph}</span>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   });
@@ -269,6 +376,9 @@ function FoodPins({
 
 export default function FogMap({
   restaurants,
+  places,
+  selectedPlaceId,
+  onSelectPlace,
   unlocked,
   visited,
   selectedId,
@@ -319,10 +429,20 @@ export default function FogMap({
       className="signage-map h-full w-full"
       style={{ background: FOG }}
     >
+      {/* Esri Light Gray Canvas: a quiet, modern base so the T lines, fog and pins carry the map. The
+          reference layer on top adds street and place labels. No API key needed. */}
       <TileLayer
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · MBTA · City of Boston'
+        url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+        attribution='Tiles &copy; Esri &mdash; Esri, HERE, Garmin, &copy; OpenStreetMap contributors · MBTA · City of Boston'
+        maxNativeZoom={16}
         maxZoom={19}
+      />
+      <TileLayer
+        url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
+        maxNativeZoom={16}
+        maxZoom={19}
+        pane="overlayPane"
+        zIndex={2}
       />
       <Flyer target={flyTo} />
       <TapCatcher onHood={onSelectNeighborhood} onEmpty={onMapTap} />
@@ -356,6 +476,10 @@ export default function FogMap({
           renderer={renderers.food}
           onSelect={onSelectRestaurant}
         />
+      </Pane>
+
+      <Pane name="places" style={{ zIndex: 435 }}>
+        <PlacePins places={places} unlocked={unlocked} selectedId={selectedPlaceId} onSelect={onSelectPlace} />
       </Pane>
 
       {userPos && (

@@ -1,6 +1,6 @@
 // POST /api/checkin
 // 1. who (auth) -> 2. where (75 m) -> 3. proof (Gemini receipt) -> 4. store (one transaction)
-// -> 5. Solana side effects (after commit, never block) -> 6. respond.
+// -> 5. respond.
 import { NextResponse } from "next/server";
 import { userFromRequest } from "@/lib/authServer";
 import { DEMO_MODE } from "@/lib/config";
@@ -8,7 +8,6 @@ import { getRestaurant } from "@/lib/data";
 import { distanceMeters } from "@/lib/geo";
 import { verifyReceipt } from "@/lib/gemini";
 import { CHECKIN_RADIUS_M } from "@/lib/scoring";
-import { logCheckin, mintBadge } from "@/lib/solana";
 import { checkinFacts, getStore } from "@/lib/store";
 import type { CheckinRequest, CheckinResult } from "@/lib/types";
 
@@ -81,27 +80,13 @@ export async function POST(req: Request) {
   }
   if (!outcome.ok) return fail("You already checked in here", 409);
 
-  // 5. Solana (both never throw and fall back to fake values without keys)
-  const [txSignature, badgeMint] = await Promise.all([
-    logCheckin({ uid: user.uid, restaurantId: r.id, neighborhood: r.neighborhood, t: Date.now() }),
-    outcome.unlockedNeighborhood ? mintBadge(user.uid, outcome.unlockedNeighborhood) : Promise.resolve(undefined),
-  ]);
-  await Promise.all([
-    store.attachTxSignature(outcome.checkinId, txSignature),
-    badgeMint && outcome.unlockedNeighborhood
-      ? store.attachBadgeMint(user.uid, outcome.unlockedNeighborhood, badgeMint)
-      : undefined,
-  ]).catch((err) => console.error("attach Solana refs failed", err));
-
-  // 6. Respond
+  // 5. Respond
   return NextResponse.json({
     ok: true,
     pointsEarned: outcome.pointsEarned,
     totalPoints: outcome.totalPoints,
     unlockedNeighborhood: outcome.unlockedNeighborhood,
-    badgeMint,
     questCompleted: outcome.questCompleted,
     co2SavedKg: co2,
-    txSignature,
   } satisfies CheckinResult);
 }

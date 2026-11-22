@@ -128,28 +128,6 @@ export default function UnlockScreen({
           <span className="text-[26px] font-black tracking-[-0.5px] text-signal">+{result.pointsEarned} points</span>
         </div>
 
-        {result.badgeMint && (
-          <p className="flex items-center gap-3 text-[15px]">
-            <BadgeIcon size={26} className="shrink-0" />
-            <span>
-              <b>Badge minted</b> to your wallet on Solana devnet.
-              {!DEMO_MODE && (
-                <>
-                  {" "}
-                  <a
-                    className="font-bold text-line-blue underline underline-offset-2"
-                    target="_blank"
-                    rel="noreferrer"
-                    href={`https://explorer.solana.com/address/${result.badgeMint}?cluster=devnet`}
-                  >
-                    View badge
-                  </a>
-                </>
-              )}
-            </span>
-          </p>
-        )}
-
         <div className="space-y-2.5 pt-2">
           <Link href="/" className={`${buttonClass("dark")} w-full`}>
             See the map

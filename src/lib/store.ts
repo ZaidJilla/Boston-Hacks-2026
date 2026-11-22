@@ -47,9 +47,6 @@ export type RecordCheckinOutcome =
 export interface GameStore {
   /** Everything in one atomic step: first visit, checkin row, unlock, quests, points. */
   recordCheckin(input: RecordCheckinInput): Promise<RecordCheckinOutcome>;
-  /** Called after commit, once Solana returns. Must never fail the request. */
-  attachTxSignature(checkinId: string, txSignature: string): Promise<void>;
-  attachBadgeMint(uid: string, neighborhood: string, badgeMint: string): Promise<void>;
   /** Progress for the profile page. Works for players with no check-ins yet. */
   getProfile(user: StoreUser): Promise<Profile>;
   /** Cheap pre-check so duplicates don't cost a Gemini call. recordCheckin still enforces it. */
@@ -70,7 +67,7 @@ interface ProfileFacts {
   rank: number | null;
   totalPlayers: number;
   hoodCounts: Map<string, number>; // neighborhood -> distinct restaurants
-  unlocks: Map<string, string | undefined>; // neighborhood -> badge mint
+  unlocks: Set<string>; // unlocked neighborhoods
   quests: Map<string, { stops: number; completed: boolean }>; // line -> progress
   visited: string[];
 }
@@ -91,7 +88,6 @@ function buildProfile(user: StoreUser, f: ProfileFacts): Profile {
       visited: Math.min(f.hoodCounts.get(id) ?? 0, UNLOCK_THRESHOLD),
       needed: UNLOCK_THRESHOLD,
       unlocked: f.unlocks.has(id),
-      badgeMint: f.unlocks.get(id),
     }))
     .sort((a, b) => Number(b.unlocked) - Number(a.unlocked) || b.visited - a.visited || a.name.localeCompare(b.name));
 
@@ -143,7 +139,6 @@ const g = globalThis as unknown as {
     users: Map<string, UserDoc>;
     checkins: MemCheckin[];
     quests: Map<string, MemQuest>; // key: `${uid}:${line}`
-    badges: Map<string, string>; // key: `${uid}:${neighborhood}` -> mint
     nextId: number;
     seeded: boolean;
   };
@@ -152,7 +147,6 @@ export const mem = (g.__storeV2 ??= {
   users: new Map(),
   checkins: [] as MemCheckin[],
   quests: new Map(),
-  badges: new Map(),
   nextId: 1,
   seeded: false,
 });
@@ -249,15 +243,6 @@ const memStore: GameStore = {
     return memRecord(input);
   },
 
-  async attachTxSignature(checkinId, txSignature) {
-    const c = mem.checkins.find((x) => x.id === checkinId);
-    if (c) c.txSignature = txSignature;
-  },
-
-  async attachBadgeMint(uid, neighborhood, badgeMint) {
-    mem.badges.set(`${uid}:${neighborhood}`, badgeMint);
-  },
-
   async hasVisited(uid, restaurantId) {
     ensureMemSeeded();
     return mem.checkins.some((c) => c.uid === uid && c.restaurantId === restaurantId);
@@ -285,7 +270,7 @@ const memStore: GameStore = {
       rank: u ? board.findIndex((r) => r.id === user.uid) + 1 : null,
       totalPlayers: board.length,
       hoodCounts: new Map([...perHood].map(([h, rs]) => [h, rs.size])),
-      unlocks: new Map((u?.unlocked ?? []).map((h: string) => [h, mem.badges.get(`${user.uid}:${h}`)] as const)),
+      unlocks: new Set<string>(u?.unlocked ?? []),
       quests,
       visited: [...new Set(mine.map((c) => c.restaurantId))],
     });
@@ -380,18 +365,6 @@ const pgStore: GameStore = {
     });
   },
 
-  async attachTxSignature(checkinId, txSignature) {
-    await getPool()?.query(`UPDATE checkins SET tx_signature = $2 WHERE id = $1`, [checkinId, txSignature]);
-  },
-
-  async attachBadgeMint(uid, neighborhood, badgeMint) {
-    await getPool()?.query(`UPDATE unlocks SET badge_mint = $3 WHERE uid = $1 AND neighborhood = $2`, [
-      uid,
-      neighborhood,
-      badgeMint,
-    ]);
-  },
-
   async hasVisited(uid, restaurantId) {
     const r = await getPool()!.query(`SELECT 1 FROM first_visits WHERE uid = $1 AND restaurant_id = $2`, [
       uid,
@@ -417,8 +390,8 @@ const pgStore: GameStore = {
            FROM checkins WHERE uid = $1 AND verified GROUP BY neighborhood`,
         uid,
       ),
-      pool.query<{ neighborhood: string; badge_mint: string | null }>(
-        `SELECT neighborhood, badge_mint FROM unlocks WHERE uid = $1`,
+      pool.query<{ neighborhood: string }>(
+        `SELECT neighborhood FROM unlocks WHERE uid = $1`,
         uid,
       ),
       pool.query<{ line: string; n: number; completed: boolean }>(
@@ -436,7 +409,7 @@ const pgStore: GameStore = {
       rank: row ? row.rank : null,
       totalPlayers: total.rows[0].n,
       hoodCounts: new Map(hoods.rows.map((r) => [r.neighborhood, r.n])),
-      unlocks: new Map(unlocks.rows.map((r) => [r.neighborhood, r.badge_mint ?? undefined])),
+      unlocks: new Set(unlocks.rows.map((r) => r.neighborhood)),
       quests: new Map(quests.rows.map((r) => [r.line, { stops: r.n, completed: r.completed }])),
       visited: visits.rows.map((r) => r.restaurant_id),
     });

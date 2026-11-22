@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import AddToTrip from "@/components/plan/AddToTrip";
 import { chipClass } from "@/components/ui/Button";
 import PageHeader from "@/components/signage/PageHeader";
 import LineBullet, { LINE_NAME, LINE_ORDER, lineTextColor } from "@/components/signage/LineBullet";
@@ -10,18 +11,26 @@ import { useArrivals } from "@/components/signage/useArrivals";
 import { useUnlocked } from "@/components/map/useUnlocked";
 import { LINE_COLORS } from "@/lib/config";
 // lib/data, not lib/geo: geo also bundles the neighborhood polygons, which this page doesn't need.
-import { restaurants as baseRestaurants } from "@/lib/data";
+import { getStation, restaurants as baseRestaurants } from "@/lib/data";
 import { UNLOCK_THRESHOLD } from "@/lib/scoring";
 import type { CravingInfo, Restaurant as FullRestaurant } from "@/lib/geo";
 import cravingsJson from "../../../data/cravings.json";
-import type { ChatTurn, ConciergeReply } from "@/lib/agent";
-import type { Craving, Restaurant, RouteResult } from "@/lib/types";
+import type { ChatTurn, ConciergeReply, DetourInfo } from "@/lib/agent";
+import type { Craving, PlaceRow, Restaurant, RouteResult } from "@/lib/types";
 
 interface Message extends ChatTurn {
   picks?: Restaurant[];
+  /** Landmarks and shopping from a route-aware answer. */
+  places?: PlaceRow[];
+  detours?: DetourInfo[];
 }
 
 const QUICK_REPLIES = ["Cheaper", "Somewhere new", "Open now"];
+const ROUTE_EXAMPLES = [
+  "I'm at Kenmore going to Chinatown, I also want food",
+  "Kenmore to Chinatown, I also want to go shopping",
+  "From Harvard to Fenway, show me a museum or park",
+];
 
 // data/restaurants.json carries more fields than the base type; same objects as lib/geo.
 const restaurants = baseRestaurants as FullRestaurant[];
@@ -54,7 +63,10 @@ export default function ConciergePage() {
       });
       const data = (await res.json()) as Partial<ConciergeReply>;
       if (!res.ok || !data.message) throw new Error(data.message ?? "bad response");
-      setMessages((m) => [...m, { role: "assistant", content: data.message as string, picks: data.picks }]);
+      setMessages((m) => [
+        ...m,
+        { role: "assistant", content: data.message as string, picks: data.picks, places: data.places, detours: data.detours },
+      ]);
     } catch {
       setMessages((m) => [...m, { role: "assistant", content: "Something went wrong. Try again." }]);
     }
@@ -99,9 +111,19 @@ export default function ConciergePage() {
 
       <div className="flex-1 space-y-3 px-4 pb-4" aria-live="polite">
         {messages.length === 0 && (
-          <p className="max-w-[88%] rounded-[18px] rounded-bl-[4px] bg-panel px-4 py-3 text-[16px] leading-snug">
-            Tell me what you&rsquo;re craving and your budget. I&rsquo;ll find spots near a T stop.
-          </p>
+          <div className="space-y-3">
+            <p className="max-w-[88%] rounded-[18px] rounded-bl-[4px] bg-panel px-4 py-3 text-[16px] leading-snug">
+              Tell me what you&rsquo;re craving and your budget, or where you are and where you&rsquo;re going. I&rsquo;ll find spots
+              that barely change your trip.
+            </p>
+            <div className="flex flex-wrap gap-2.5" role="group" aria-label="Examples">
+              {ROUTE_EXAMPLES.map((q) => (
+                <button key={q} type="button" disabled={busy} onClick={() => send(q)} className={`${chipClass()} !h-auto !min-h-[44px] !px-4 !py-2 text-left !text-[15px]`}>
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
 
         {messages.map((m, i) =>
@@ -116,7 +138,8 @@ export default function ConciergePage() {
               <p className="max-w-[88%] rounded-[18px] rounded-bl-[4px] bg-panel px-4 py-3 text-[16px] leading-snug">
                 {m.content}
               </p>
-              {m.picks?.map((r) => <PickCard key={r.id} id={r.id} />)}
+              {m.places?.map((p) => <PlacePick key={p.id} p={p} detour={m.detours?.find((d) => d.id === p.id)} />)}
+              {m.picks?.map((r) => <PickCard key={r.id} id={r.id} detour={m.detours?.find((d) => d.id === r.id)} />)}
             </div>
           ),
         )}
@@ -171,7 +194,7 @@ export default function ConciergePage() {
 }
 
 /** One suggested spot: line-colored station strip with the next train, then the spot and its trip. */
-function PickCard({ id }: { id: string }) {
+function PickCard({ id, detour }: { id: string; detour?: DetourInfo }) {
   const r = byId.get(id);
   const { unlocked, checkins } = useUnlocked();
   const st = r?.nearestStation;
@@ -202,6 +225,7 @@ function PickCard({ id }: { id: string }) {
   const left = unlocked.has(r.neighborhood) ? 0 : Math.max(0, UNLOCK_THRESHOLD - eaten);
 
   return (
+    <div className="space-y-2">
     <Link href={`/restaurant/${r.id}`} className="block overflow-hidden rounded-card border-2 border-ink bg-white shadow-soft">
       <div className="flex items-center justify-between gap-3 px-3 py-2" style={{ background: color, color: fg }}>
         <span className="flex min-w-0 items-center gap-2">
@@ -230,6 +254,7 @@ function PickCard({ id }: { id: string }) {
             </span>
           )}
         </div>
+        {detour && <p className="text-[14px] font-bold text-line-blue">{`+${detour.addedMin} min. ${detour.reason}`}</p>}
         {route && (
           <div className="flex items-center gap-3">
             <div className="min-w-0 flex-1">
@@ -240,5 +265,47 @@ function PickCard({ id }: { id: string }) {
         )}
       </div>
     </Link>
+    <AddToTrip itemKey={`r:${r.id}`} name={r.name} />
+    </div>
+  );
+}
+
+/** A landmark or shopping pick from a route-aware answer. Same strip-and-card look as a restaurant. */
+function PlacePick({ p, detour }: { p: PlaceRow; detour?: DetourInfo }) {
+  const st = getStation(p.nearestStopId);
+  const line = st ? LINE_ORDER.find((l) => st.lines.includes(l)) : undefined;
+  const arrivals = useArrivals(st?.id);
+  const next = arrivals?.find((a) => !line || a.line === line);
+  const color = line ? LINE_COLORS[line] : "#000000";
+  const fg = line ? lineTextColor(line) : "#FFFFFF";
+  const what = p.subtype.replace(/^historic-/, "").replace(/_/g, " ");
+  return (
+    <div className="space-y-2">
+      <div className="overflow-hidden rounded-card border-2 border-ink bg-white shadow-soft">
+        {st && (
+          <div className="flex items-center justify-between gap-3 px-3 py-2" style={{ background: color, color: fg }}>
+            <span className="flex min-w-0 items-center gap-2">
+              {line && <LineBullet line={line} size={26} inverted label={false} />}
+              <span className="truncate text-[15px] font-extrabold">
+                {line ? LINE_NAME[line] : "T"} · {st.name}
+              </span>
+            </span>
+            {next && (
+              <span className="shrink-0 text-[15px] font-extrabold">
+                Next train {next.minutes <= 0 ? "now" : `${next.minutes} min`}
+              </span>
+            )}
+          </div>
+        )}
+        <div className="space-y-2 px-4 py-3">
+          <p className="truncate text-[20px] font-black leading-tight tracking-[-0.5px]">{p.name}</p>
+          <p className="truncate text-[15px] capitalize text-muted">
+            {p.type === "landmark" ? "Landmark" : "Shopping"} · {what} · {p.neighborhoodName}
+          </p>
+          {detour && <p className="text-[14px] font-bold text-line-blue">{`+${detour.addedMin} min. ${detour.reason}`}</p>}
+        </div>
+      </div>
+      <AddToTrip itemKey={`p:${p.id}`} name={p.name} />
+    </div>
   );
 }
