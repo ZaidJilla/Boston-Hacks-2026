@@ -134,3 +134,36 @@ export interface LeaderboardRow {
   college?: string;
   points: number;
 }
+
+// GET /api/profile
+export interface NeighborhoodProgress {
+  id: string;
+  name: string;
+  visited: number; // distinct restaurants checked into
+  needed: number; // UNLOCK_THRESHOLD
+  unlocked: boolean;
+  badgeMint?: string; // Solana mint address, once unlocked
+}
+
+export interface QuestProgress {
+  line: LineId;
+  name: string; // "Orange Line"
+  color: string;
+  stops: number; // distinct stops checked in near
+  needed: number; // LINE_QUEST_STOPS
+  completed: boolean;
+}
+
+export interface Profile {
+  uid: string;
+  displayName: string;
+  college: string;
+  points: number;
+  co2SavedKg: number;
+  checkins: number;
+  rank: number | null; // citywide, null before the first check-in
+  totalPlayers: number;
+  neighborhoods: NeighborhoodProgress[]; // every neighborhood, most progress first
+  quests: QuestProgress[]; // every line
+  visitedRestaurantIds: string[]; // e.g. to mark visited pins on the map
+}

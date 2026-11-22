@@ -1,10 +1,14 @@
 "use client";
-// Check-in: geolocation + receipt photo (real), or "Simulate check-in" in demo mode.
-import { useRef, useState } from "react";
+// Sticky check-in bar: geolocation + receipt photo (real), or "Simulate check-in" in demo mode.
+// "Check in" asks for the receipt photo first if there isn't one, then submits.
+import { useCallback, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Button from "@/components/ui/Button";
 import { DEMO_MODE } from "@/lib/config";
 import { getClientAuth } from "@/lib/firebase";
+import { CHECKIN_RADIUS_M } from "@/lib/scoring";
 import type { CheckinResult } from "@/lib/types";
+import UnlockScreen from "./UnlockScreen";
 
 /** Downscale a photo to ~1280 px JPEG and return base64 without the data: prefix. */
 async function photoToBase64(file: File): Promise<string> {
@@ -28,24 +32,35 @@ function getPosition(): Promise<{ lat: number; lng: number }> {
   });
 }
 
-const prettyHood = (id: string) => id.split("-").map((w) => w[0].toUpperCase() + w.slice(1)).join(" ");
+const prettyHood = (id: string) => id.split("-").map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(" ");
 
-export default function CheckinPanel({ restaurantId }: { restaurantId: string }) {
+export default function CheckinPanel({
+  restaurantId,
+  isChain,
+  hoodId,
+  hoodName,
+}: {
+  restaurantId: string;
+  isChain: boolean;
+  hoodId: string;
+  hoodName: string;
+}) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [receipt, setReceipt] = useState<File | null>(null);
   const [result, setResult] = useState<CheckinResult | null>(null);
+  const [showUnlock, setShowUnlock] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function submit(simulate: boolean) {
+  async function submit(simulate: boolean, photo: File | null = receipt) {
     setBusy(true);
     setError(null);
     setResult(null);
     try {
       let extra: Record<string, unknown> = {};
       if (!simulate) {
-        if (!receipt) throw new Error("Add a photo of your receipt first.");
-        const [pos, receiptBase64] = await Promise.all([getPosition(), photoToBase64(receipt)]);
+        if (!photo) throw new Error("Add a photo of your receipt first.");
+        const [pos, receiptBase64] = await Promise.all([getPosition(), photoToBase64(photo)]);
         extra = { ...pos, receiptBase64 };
       }
       const idToken = await getClientAuth()?.currentUser?.getIdToken();
@@ -60,68 +75,120 @@ export default function CheckinPanel({ restaurantId }: { restaurantId: string })
       const data = (await res.json()) as CheckinResult;
       if (!data.ok) throw new Error(data.error ?? "Check-in failed.");
       setResult(data);
+      setShowUnlock(Boolean(data.unlockedNeighborhood));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Check-in failed.");
     }
     setBusy(false);
   }
 
+  const closeUnlock = useCallback(() => setShowUnlock(false), []);
+
   return (
-    <div className="space-y-3">
-      <div className="rounded-lg bg-white p-3 space-y-2">
-        <label htmlFor="receipt" className="block text-sm font-medium">Receipt photo</label>
+    <>
+      <div className="sticky bottom-nav z-[900] -mx-4 space-y-2.5 border-t-2 border-ink bg-white px-4 pb-3 pt-3">
+        <label htmlFor="receipt" className="sr-only">
+          Receipt photo
+        </label>
         <input
-          ref={fileRef} id="receipt" type="file" accept="image/*" capture="environment"
-          onChange={(e) => setReceipt(e.target.files?.[0] ?? null)}
-          className="block w-full text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-ink/10 file:px-3 file:py-2"
+          ref={fileRef}
+          id="receipt"
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="sr-only"
+          tabIndex={-1}
+          onChange={(e) => {
+            const f = e.target.files?.[0] ?? null;
+            setReceipt(f);
+            if (f) submit(false, f);
+          }}
         />
-        {receipt && <p className="text-xs text-ink/60 truncate">{receipt.name}</p>}
-        <Button disabled={busy} onClick={() => submit(false)} className="w-full">
-          {busy ? "Checking in…" : "Check in"}
-        </Button>
-        <p className="text-xs text-ink/50">You need to be at the restaurant, and the receipt has to be from today.</p>
-      </div>
 
-      {DEMO_MODE && (
-        <Button disabled={busy} onClick={() => submit(true)} className="w-full bg-ink">
-          Simulate check-in
-        </Button>
-      )}
-
-      {error && <p role="alert" className="rounded-lg bg-line-red/10 p-3 text-sm text-line-red">{error}</p>}
-
-      {result && (
-        <div role="status" className="space-y-2">
-          {result.unlockedNeighborhood && (
-            <div className="rounded-lg border-2 border-line-green bg-line-green/10 p-4 text-center">
-              <p className="text-lg font-bold text-line-green">{prettyHood(result.unlockedNeighborhood)} unlocked</p>
-              <p className="text-sm">The fog is gone. Badge minted on Solana.</p>
-              {result.badgeMint && <p className="mt-1 break-all font-mono text-[10px] text-ink/50">{result.badgeMint}</p>}
-            </div>
-          )}
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <Stat label="Points earned" value={`+${result.pointsEarned}`} />
-            <Stat label="Total" value={String(result.totalPoints)} />
-            <Stat label="CO₂ saved" value={`${result.co2SavedKg} kg`} />
+        {error && (
+          <p role="alert" className="text-[14px] font-bold text-line-red">
+            {error}
+          </p>
+        )}
+        {result && !result.unlockedNeighborhood && (
+          <div role="status" className="flex items-center justify-between gap-3 rounded-card bg-ink px-4 py-2.5 text-white">
+            <span className="text-[15px] font-bold">
+              Checked in{result.co2SavedKg > 0 && <> · {result.co2SavedKg} kg CO2 saved</>}
+              {result.questCompleted && <> · {result.questCompleted} line quest done</>}
+            </span>
+            <span className="shrink-0 text-[20px] font-black text-signal">+{result.pointsEarned}</span>
           </div>
-          {result.questCompleted && <p className="text-sm font-semibold">Line quest complete: {result.questCompleted} line</p>}
-          {result.txSignature && !DEMO_MODE && (
-            <a className="block text-xs text-line-blue underline" target="_blank" rel="noreferrer"
-               href={`https://explorer.solana.com/tx/${result.txSignature}?cluster=devnet`}>
-              View check-in on Solana
-            </a>
+        )}
+        {result?.txSignature && !DEMO_MODE && (
+          <a
+            className="hit-44 inline-block text-[14px] font-bold text-line-blue underline underline-offset-2"
+            target="_blank"
+            rel="noreferrer"
+            href={`https://explorer.solana.com/tx/${result.txSignature}?cluster=devnet`}
+          >
+            View check-in on Solana
+          </a>
+        )}
+        {result?.unlockedNeighborhood && !showUnlock && (
+          <button
+            type="button"
+            onClick={() => setShowUnlock(true)}
+            className="w-full rounded-card bg-line-green px-4 py-2.5 text-left text-[15px] font-bold text-white"
+          >
+            Neighborhood unlocked · +{result.pointsEarned} points
+          </button>
+        )}
+        {!error && !result && (
+          <p className="text-[14px] text-muted">
+            {receipt
+              ? `Receipt: ${receipt.name}`
+              : `Be within ${CHECKIN_RADIUS_M} m and add your receipt to check in.`}
+          </p>
+        )}
+
+        <div className="flex gap-2.5">
+          <Button
+            disabled={busy}
+            onClick={() => (receipt ? submit(false) : fileRef.current?.click())}
+            className="flex-1 whitespace-nowrap !px-2 !text-[15px]"
+          >
+            {busy ? "Checking in…" : "Check in"}
+          </Button>
+          {DEMO_MODE && (
+            <Button
+              variant="dark"
+              disabled={busy}
+              onClick={() => submit(true)}
+              className="flex-1 whitespace-nowrap !px-2 !text-[15px]"
+            >
+              Simulate check-in
+            </Button>
           )}
         </div>
-      )}
-    </div>
-  );
-}
+        {receipt && !busy && (
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="hit-44 text-[14px] font-bold text-line-blue underline underline-offset-2"
+          >
+            Use a different receipt
+          </button>
+        )}
+      </div>
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg bg-white p-2">
-      <p className="text-base font-bold tabular-nums">{value}</p>
-      <p className="text-[11px] text-ink/60">{label}</p>
-    </div>
+      {/* Portal: a fixed overlay must not pick up margins or stacking from the page layout. */}
+      {result?.unlockedNeighborhood &&
+        showUnlock &&
+        createPortal(
+          <UnlockScreen
+            result={result}
+            // a check-in only unlocks the restaurant's own neighborhood
+            hoodName={result.unlockedNeighborhood === hoodId ? hoodName : prettyHood(result.unlockedNeighborhood)}
+            isChain={isChain}
+            onClose={closeUnlock}
+          />,
+          document.body,
+        )}
+    </>
   );
 }

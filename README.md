@@ -61,7 +61,7 @@ On Vultr: create a Cloud Compute instance with Docker, copy the env file, run th
 
 ## Team
 
-- 
+- Raed
 - 
 - 
 - 
