@@ -4,7 +4,8 @@
 @import "leaflet/dist/leaflet.css";
 
 html, body { height: 100%; }
-body { background: #FFFFFF; color: #000000; }
+/* A very faint subway-map texture (colored lines with stations) so white pages aren't blank. The map is full-screen and covers it. */
+body { background-color: #FFFFFF; background-image: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='360' height='360' viewBox='0 0 360 360'><g fill='none' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'><path d='M0 70 H110 L150 110 H210 L250 70 H360' stroke='%23DA291C' stroke-opacity='.10'/><path d='M0 250 H70 L110 290 H250 L290 250 H360' stroke='%2300843D' stroke-opacity='.10'/><path d='M60 0 V120 L100 160 V200 L60 240 V360' stroke='%23ED8B00' stroke-opacity='.10'/><path d='M290 0 V90 L250 130 V230 L290 270 V360' stroke='%23003DA5' stroke-opacity='.10'/></g><g fill='%23fff' stroke-width='3'><circle cx='110' cy='70' r='5' stroke='%23DA291C' stroke-opacity='.2'/><circle cx='180' cy='110' r='5' stroke='%23DA291C' stroke-opacity='.2'/><circle cx='330' cy='70' r='5' stroke='%23DA291C' stroke-opacity='.2'/><circle cx='30' cy='250' r='5' stroke='%2300843D' stroke-opacity='.2'/><circle cx='180' cy='290' r='5' stroke='%2300843D' stroke-opacity='.2'/><circle cx='330' cy='250' r='5' stroke='%2300843D' stroke-opacity='.2'/><circle cx='60' cy='40' r='5' stroke='%23ED8B00' stroke-opacity='.2'/><circle cx='100' cy='180' r='5' stroke='%23ED8B00' stroke-opacity='.2'/><circle cx='60' cy='310' r='5' stroke='%23ED8B00' stroke-opacity='.2'/><circle cx='290' cy='30' r='5' stroke='%23003DA5' stroke-opacity='.2'/><circle cx='250' cy='180' r='5' stroke='%23003DA5' stroke-opacity='.2'/><circle cx='290' cy='320' r='5' stroke='%23003DA5' stroke-opacity='.2'/><circle cx='60' cy='70' r='8' stroke='%23000' stroke-opacity='.2'/><circle cx='290' cy='70' r='8' stroke='%23000' stroke-opacity='.2'/><circle cx='60' cy='250' r='8' stroke='%23000' stroke-opacity='.2'/></g></svg>"); background-size: 360px 360px; color: #000000; }
 
 /* Keyboard focus: 3px T-blue ring; white for controls sitting on a dark or colored surface
    (add .surface-dark to that container, not to the control). */
@@ -102,6 +103,8 @@ body { background: #FFFFFF; color: #000000; }
 @keyframes badge-pop { 0% { opacity: 0; transform: scale(0.4) rotate(-8deg); } 100% { opacity: 1; transform: none; } }
 @keyframes badge-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: scale(0.88) translateY(8px); } }
 @keyframes fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes soft-drop { from { opacity: 0; transform: translateY(-14px) scale(0.9); } 60% { transform: translateY(2px) scale(1.03); } to { opacity: 1; transform: none; } }
+.unlock-drop-soft { animation: soft-drop 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 .unlock-drop { animation: unlock-drop 1s 0.2s both; }
 .unlock-ripple { animation: unlock-ripple 2.7s ease-out infinite backwards; border: 3px solid rgba(255, 255, 255, 0.6); }
 .unlock-pin { animation: unlock-pin 0.45s 0.72s backwards; }
@@ -153,7 +156,7 @@ body { background: #FFFFFF; color: #000000; }
 .nav-bar { transform-origin: left; animation: nav-bar 0.3s ease-out; }
 
 @media (prefers-reduced-motion: reduce) {
-  .page-in, .sheet-up, .fade-in, .unlock-drop, .unlock-ripple, .unlock-pin, .badge-pop, .badge-out, .fade-out, .unlock-rise, .unlock-rings, .unlock-spark,
+  .page-in, .sheet-up, .fade-in, .unlock-drop, .unlock-ripple, .unlock-pin, .unlock-drop-soft, .badge-pop, .badge-out, .fade-out, .unlock-rise, .unlock-rings, .unlock-spark,
   .nav-pop, .nav-bar {
     animation: none !important;
   }
