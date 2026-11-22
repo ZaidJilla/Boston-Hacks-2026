@@ -1,9 +1,11 @@
 // Server only. Photos and extra details for one restaurant.
 // 1. Google Places API (New) when GOOGLE_PLACES_API_KEY is set: real photos, rating, hours, website.
 // 2. Otherwise photos from the restaurant's own website (saved by `npm run data:photos`, or fetched live).
-// 3. Otherwise nothing, and the page shows what is in our OSM data. Never throws.
+// 3. Otherwise photos from Yelp when YELP_API_KEY is set (looked up live, never saved; see yelp.ts).
+// 4. Otherwise nothing, and the page shows a placeholder. Never throws.
 import { distanceMeters, type Restaurant } from "./geo";
 import { safeHttpUrl, scrapeSite, type SiteScrape } from "./siteImages";
+import { yelpPhotos } from "./yelp";
 import bakedJson from "../../data/photos.json";
 
 export interface PlacePhoto {
@@ -14,7 +16,10 @@ export interface PlacePhoto {
 }
 
 export interface PlaceDetails {
-  source: "google" | "website" | "none";
+  /** where the photos came from (rating and hours may still be Google's) */
+  source: "google" | "website" | "yelp" | "none";
+  /** the business page on the photo source, for attribution (Yelp requires a link) */
+  sourceUrl?: string;
   photos: PlacePhoto[];
   summary?: string;
   rating?: number;
@@ -45,6 +50,17 @@ export function getPlaceDetails(r: Restaurant): Promise<PlaceDetails> {
     const google = await fromGoogle(r).catch(() => null);
     if (google?.photos.length) return google;
     const site = await fromWebsite(r).catch(() => null);
+    // Still no photos: try Yelp. Keep Google's rating and hours and the site's summary either way.
+    const yelp = site?.photos.length ? null : await yelpPhotos(r);
+    if (yelp) {
+      return {
+        ...(google ?? site ?? {}),
+        source: "yelp",
+        sourceUrl: yelp.url,
+        photos: yelp.photos.map((url) => ({ url })),
+        summary: google?.summary ?? site?.summary,
+      };
+    }
     // Google matched but had no photos: keep its rating and hours, borrow the website's photos.
     if (google) return { ...google, photos: site?.photos ?? [], source: site?.photos.length ? "website" : "google", summary: google.summary ?? site?.summary };
     return site ?? { source: "none", photos: [] };
@@ -159,8 +175,9 @@ const baked = bakedJson as Record<string, SiteScrape | undefined>;
 async function fromWebsite(r: Restaurant): Promise<PlaceDetails | null> {
   const site = safeHttpUrl(r.website) ?? undefined;
   const pre = baked[r.id];
-  // Saved photos are instant and work offline; only scrape live when this place wasn't scanned.
-  const found = pre?.photos.length ? pre : ((await scrapeSite(r.website)) ?? pre);
+  // Saved photos are instant and work offline. A site the scan already checked isn't scraped
+  // again (if it had no photos, Yelp gets a turn); only sites missing from the scan go live.
+  const found = pre ?? (await scrapeSite(r.website));
   if (!found) return null;
   return {
     source: "website",

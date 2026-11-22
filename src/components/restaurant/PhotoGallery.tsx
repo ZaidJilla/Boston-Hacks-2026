@@ -20,11 +20,14 @@ export default function PhotoGallery({
   name,
   emoji,
   source,
+  sourceUrl,
 }: {
   photos: PlacePhoto[];
   name: string;
   emoji?: string;
-  source: "google" | "website" | "none";
+  source: "google" | "website" | "yelp" | "none";
+  /** the business page on the photo source; Yelp photos must link back to it */
+  sourceUrl?: string;
 }) {
   const [broken, setBroken] = useState<Set<string>>(new Set());
   const shown = photos.filter((p) => !broken.has(p.url));
@@ -75,6 +78,22 @@ export default function PhotoGallery({
                   shown[current].author
                 ))}
               {shown[current]?.author && " · Google"}
+            </>
+          ) : source === "yelp" ? (
+            <>
+              Photos from{" "}
+              {sourceUrl ? (
+                <a
+                  href={sourceUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-bold text-[#D32323] underline underline-offset-2"
+                >
+                  Yelp
+                </a>
+              ) : (
+                "Yelp"
+              )}
             </>
           ) : (
             "From their website"

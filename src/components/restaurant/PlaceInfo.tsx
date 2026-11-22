@@ -13,7 +13,7 @@ export async function RestaurantPhotos({ r }: { r: Restaurant }) {
   const d = await getPlaceDetails(r);
   const emoji = cravingById.get(r.craving)?.emoji;
   if (!d.photos.length) return <PhotoPlaceholder emoji={emoji} label={`No photos of ${r.name} yet`} />;
-  return <PhotoGallery photos={d.photos} name={r.name} emoji={emoji} source={d.source} />;
+  return <PhotoGallery photos={d.photos} name={r.name} emoji={emoji} source={d.source} sourceUrl={d.sourceUrl} />;
 }
 
 /** Google Maps search link for the place. Works without an API key. */
