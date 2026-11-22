@@ -1,7 +1,7 @@
 export const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
-/** Wordmark from the design. Working name until the domain is claimed; rename here only. */
-export const APP_NAME = "Unfog";
+/** The app's name (chewchoo.co). Used for the page title and the map header; rename here only. */
+export const APP_NAME = "ChewChoo";
 
 export const LINE_COLORS = {
   red: "#DA291C",
