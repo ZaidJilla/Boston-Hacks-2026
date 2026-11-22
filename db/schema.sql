@@ -23,7 +23,6 @@ CREATE TABLE IF NOT EXISTS checkins (
   lat             double precision NOT NULL,
   lng             double precision NOT NULL,
   verified        boolean NOT NULL DEFAULT false,
-  tx_signature    text,
   created_at      timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (id, created_at)
 );
@@ -40,7 +39,6 @@ CREATE TABLE IF NOT EXISTS first_visits (
 CREATE TABLE IF NOT EXISTS unlocks (
   uid          text NOT NULL REFERENCES users(uid),
   neighborhood text NOT NULL,
-  badge_mint   text,
   created_at   timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (uid, neighborhood)
 );

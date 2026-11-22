@@ -11,7 +11,6 @@ Built in 24 hours at BostonHacks 2026.
 - Craving concierge: ask for "cheap ramen near the Green Line" and get picks with routes
 - Live MBTA arrivals and transit directions to each spot
 - Receipt check-ins verified with Gemini
-- Neighborhood badges minted as NFTs on Solana
 - Line quests and a CO2-saved tracker
 
 ## How we use the sponsors
@@ -19,7 +18,6 @@ Built in 24 hours at BostonHacks 2026.
 | Sponsor | What we built with it |
 | --- | --- |
 | Gemini API | Reads receipt photos to confirm the restaurant and date. Powers the concierge. |
-| Solana | A badge NFT is minted to the player on each neighborhood unlock. Every check-in is written to devnet with the Memo program. |
 | Tiger Data | All game data. Check-ins are a hypertable, leaderboards are SQL queries. |
 | Mastra | The concierge agent, with tools for restaurant search, live arrivals, and routes. |
 | Vultr | The app runs in Docker on a Vultr instance. |
@@ -29,7 +27,7 @@ Built in 24 hours at BostonHacks 2026.
 
 ## Built with
 
-Next.js, TypeScript, Tailwind, Leaflet, Firebase Auth, Tiger Data, Mastra, Google Gemini, Solana, Google Routes API, MBTA GTFS and V3 API, OpenStreetMap
+Next.js, TypeScript, Tailwind, Leaflet, Firebase Auth, Tiger Data, Mastra, Google Gemini, Google Routes API, MBTA GTFS and V3 API, OpenStreetMap
 
 ## Run it locally
 
@@ -47,7 +45,6 @@ To use the real services, fill in `.env.local` (see `.env.example`), then:
 ```
 npm run db:migrate
 npm run data:seed
-npm run solana:setup
 ```
 
 ## Deploy

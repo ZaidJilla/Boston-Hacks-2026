@@ -95,8 +95,7 @@ export default function CheckinPanel({ restaurantId }: { restaurantId: string })
           {result.unlockedNeighborhood && (
             <div className="rounded-lg border-2 border-line-green bg-line-green/10 p-4 text-center">
               <p className="text-lg font-bold text-line-green">{prettyHood(result.unlockedNeighborhood)} unlocked</p>
-              <p className="text-sm">The fog is gone. Badge minted on Solana.</p>
-              {result.badgeMint && <p className="mt-1 break-all font-mono text-[10px] text-ink/50">{result.badgeMint}</p>}
+              <p className="text-sm">The fog is gone.</p>
             </div>
           )}
           <div className="grid grid-cols-3 gap-2 text-center">
@@ -105,12 +104,6 @@ export default function CheckinPanel({ restaurantId }: { restaurantId: string })
             <Stat label="CO₂ saved" value={`${result.co2SavedKg} kg`} />
           </div>
           {result.questCompleted && <p className="text-sm font-semibold">Line quest complete: {result.questCompleted} line</p>}
-          {result.txSignature && !DEMO_MODE && (
-            <a className="block text-xs text-line-blue underline" target="_blank" rel="noreferrer"
-               href={`https://explorer.solana.com/tx/${result.txSignature}?cluster=devnet`}>
-              View check-in on Solana
-            </a>
-          )}
         </div>
       )}
     </div>

@@ -59,14 +59,12 @@ export interface CheckinDoc {
   lat: number;
   lng: number;
   verified: boolean;
-  txSignature?: string;
   createdAt: number;
 }
 
 export interface UnlockDoc {
   uid: string;
   neighborhood: string;
-  badgeMint?: string;
   createdAt: number;
 }
 
@@ -92,10 +90,8 @@ export interface CheckinResult {
   pointsEarned: number;
   totalPoints: number;
   unlockedNeighborhood?: string;
-  badgeMint?: string;
   questCompleted?: LineId;
   co2SavedKg: number;
-  txSignature?: string;
 }
 
 export interface Arrival {

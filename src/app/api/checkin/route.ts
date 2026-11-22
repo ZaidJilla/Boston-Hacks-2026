@@ -3,7 +3,6 @@ import { DEMO_MODE } from "@/lib/config";
 import { getRestaurant, getStation } from "@/lib/data";
 import { distanceKm, distanceMeters } from "@/lib/geo";
 import { verifyReceipt } from "@/lib/gemini";
-import { logCheckin, mintBadge } from "@/lib/solana";
 import { mem } from "@/lib/store";
 import { adminConfigured, verifyIdToken } from "@/lib/authServer";
 import { collegeFromEmail } from "@/lib/colleges";
@@ -77,11 +76,6 @@ async function handleCheckin(
   const co2 = co2SavedKg(trip, "transit");
   const pointsEarned = pointsForCheckin({ isChain: r.isChain, unlockedNeighborhood: newlyUnlocked, questCompleted: false });
 
-  // On-chain calls can fail; the check-in itself still counts, so they never block saving state.
-  let badgeMint: string | undefined;
-  if (newlyUnlocked) badgeMint = await mintBadge(uid, r.neighborhood).catch(() => undefined);
-  const txSignature = await logCheckin({ uid, restaurantId: r.id, neighborhood: r.neighborhood }).catch(() => undefined);
-
   // Write check-in and user state together, after all awaits.
   mem.checkins.push({
     uid, restaurantId: r.id, neighborhood: r.neighborhood, nearestStopId: r.nearestStopId,
@@ -95,6 +89,6 @@ async function handleCheckin(
   return NextResponse.json({
     ok: true, pointsEarned, totalPoints: user.points,
     unlockedNeighborhood: newlyUnlocked ? r.neighborhood : undefined,
-    badgeMint, co2SavedKg: co2, txSignature,
+    co2SavedKg: co2,
   } satisfies CheckinResult);
 }

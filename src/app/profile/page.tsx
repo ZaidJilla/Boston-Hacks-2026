@@ -4,7 +4,7 @@ import Button from "@/components/ui/Button";
 
 export default function ProfilePage() {
   const { user, signIn } = useUser();
-  // TODO(Person 4): unlocked neighborhoods (x/3), NFT badges, line quests, points, CO2 saved.
+  // TODO(Person 4): unlocked neighborhoods (x/3), line quests, points, CO2 saved.
   return (
     <div className="p-4">
       <h1 className="text-xl font-bold">Profile</h1>
