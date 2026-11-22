@@ -20,7 +20,7 @@ const COLLEGES = [
 ];
 const PLAYERS_PER_COLLEGE = 7; // 42 total
 const HISTORY_DAYS = 14;
-const MAX_VISITS = 15;
+const MAX_UNLOCKS = 12; // the very top players are Legends (10+)
 
 const FIRST = ["Ava", "Liam", "Maya", "Noah", "Priya", "Diego", "Zoe", "Omar", "Lena", "Kai", "Sofia", "Eli", "Hana", "Theo"];
 const LAST = ["Chen", "Patel", "Garcia", "Kim", "Nguyen", "Okafor", "Silva", "Cohen", "Rossi", "Haddad", "Murphy", "Tran"];
@@ -50,6 +50,10 @@ export function buildSeedPlayers(now = Date.now()): SeedPlayer[] {
   const shuffled = <T>(xs: T[]) => xs.map((x) => [rand(), x] as const).sort((a, b) => a[0] - b[0]).map(([, x]) => x);
   const randomPastDate = () => new Date(now - rand() * HISTORY_DAYS * 86_400_000);
 
+  const byHood = new Map<string, Restaurant[]>();
+  for (const r of restaurants) byHood.set(r.neighborhood, [...(byHood.get(r.neighborhood) ?? []), r]);
+  const hoodsWithFood = [...byHood.keys()].filter((h) => byHood.get(h)!.length >= 3).sort();
+
   const players: SeedPlayer[] = [];
   const usedNames = new Set<string>();
   for (const c of COLLEGES) {
@@ -61,10 +65,17 @@ export function buildSeedPlayers(now = Date.now()): SeedPlayer[] {
       } while (usedNames.has(first + last));
       usedNames.add(first + last);
 
-      // rand()^2 skews low: a few power users, most casual. Good for a "climb" in the demo.
-      const n = Math.floor(rand() ** 2 * (Math.min(restaurants.length, MAX_VISITS) + 1));
-      const visits = shuffled(restaurants)
-        .slice(0, n)
+      // Players explore neighborhood by neighborhood, like the real game: 3 restaurants unlocks one, and
+      // points follow from that, so rank and points agree. rand()^2.6 skews low: a few power users, most
+      // casual. 0 unlocks = Visitor, 1+ = Regular, 4+ = Local, 10+ = Legend.
+      const unlocks = Math.floor(rand() ** 2.6 * (MAX_UNLOCKS + 1));
+      const hoods = shuffled(hoodsWithFood);
+      const chosen: Restaurant[] = [];
+      for (const h of hoods.slice(0, unlocks)) chosen.push(...shuffled(byHood.get(h)!).slice(0, 3));
+      // Everyone has dipped a toe somewhere else: one or two visits that don't complete a neighborhood.
+      const dip = hoods[unlocks];
+      if (dip && (unlocks > 0 || rand() < 0.7)) chosen.push(...shuffled(byHood.get(dip)!).slice(0, 1 + Math.floor(rand() * 2)));
+      const visits = chosen
         .map((restaurant) => ({ restaurant, at: randomPastDate() }))
         .sort((a, b) => a.at.getTime() - b.at.getTime());
 
