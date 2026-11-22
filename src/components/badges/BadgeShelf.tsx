@@ -34,9 +34,9 @@ function BadgeSheet({ badge, earned, onClose }: { badge: Badge; earned: boolean;
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   return createPortal(
-    <div className="fixed inset-0 z-[2000] flex items-end justify-center" role="dialog" aria-modal="true" aria-labelledby="badge-title">
+    <div className="fixed inset-0 z-[2000] flex items-center justify-center px-5" role="dialog" aria-modal="true" aria-labelledby="badge-title">
       <button type="button" aria-label="Close" onClick={onClose} className="fade-in absolute inset-0 cursor-default bg-black/60" tabIndex={-1} />
-      <div className="sheet-up relative w-full max-w-md rounded-t-sheet bg-white px-6 pb-8 pt-6 text-center">
+      <div className="badge-pop relative w-full max-w-sm rounded-sheet bg-white px-6 pb-6 pt-7 text-center shadow-card">
         <div className="mx-auto flex w-fit justify-center">
           <BadgeMedallion emoji={badge.emoji} color={badge.color} earned={earned} size={96} />
         </div>
