@@ -60,9 +60,9 @@ export default function PlacePicker({
 
   return (
     <div ref={box} className="relative">
-      {!hideLabel && <label htmlFor={id} className="mb-1 block text-xs font-semibold uppercase tracking-wide text-ink/60">{label}</label>}
+      {!hideLabel && <label htmlFor={id} className="mb-1 block text-xs font-semibold uppercase tracking-wide text-muted">{label}</label>}
       {value ? (
-        <div className="flex min-h-[44px] items-center justify-between gap-2 rounded-lg border border-black/15 bg-white px-3">
+        <div className="flex min-h-[44px] items-center justify-between gap-2 rounded-full border-2 border-ink bg-white px-3">
           <span className="min-w-0 truncate text-sm font-medium">{value.name}</span>
           {onClear && (
             <button type="button" onClick={onClear} aria-label={`Change ${label.toLowerCase()}`} className="shrink-0 text-sm text-line-blue underline">
@@ -83,7 +83,7 @@ export default function PlacePicker({
             role="combobox"
             aria-expanded={open && results.length > 0}
             aria-controls={`${id}-list`}
-            className="min-h-[44px] w-full rounded-lg border border-black/20 bg-white px-3 text-sm"
+            className="min-h-[44px] w-full rounded-full border-2 border-ink bg-white px-3 text-sm"
           />
           {allowLocation && (
             <button type="button" onClick={useMyLocation} disabled={locating} className="mt-1 min-h-[44px] text-sm text-line-blue underline disabled:opacity-50">
@@ -97,14 +97,14 @@ export default function PlacePicker({
                 <li key={r.key} role="option" aria-selected={false}>
                   <button type="button" onClick={() => pick(toUiPlace(r))} className="flex min-h-[44px] w-full flex-col items-start justify-center px-3 py-1.5 text-left active:bg-black/5">
                     <span className="text-sm font-medium">{r.name}</span>
-                    <span className="text-xs text-ink/60">{r.sub}</span>
+                    <span className="text-xs text-muted">{r.sub}</span>
                   </button>
                 </li>
               ))}
             </ul>
           )}
           {open && q.trim().length >= 2 && results.length === 0 && (
-            <p className="absolute inset-x-0 top-full z-20 mt-1 rounded-lg border border-black/10 bg-white p-3 text-sm text-ink/60 shadow-lg">No match. Try a station or neighborhood.</p>
+            <p className="absolute inset-x-0 top-full z-20 mt-1 rounded-lg border border-black/10 bg-white p-3 text-sm text-muted shadow-lg">No match. Try a station or neighborhood.</p>
           )}
         </>
       )}

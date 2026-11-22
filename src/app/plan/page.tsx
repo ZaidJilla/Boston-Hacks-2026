@@ -2,6 +2,8 @@
 // Plan a day on the T: a start, stops along the way, an end. One timeline with a clock time for every
 // stop, because transit apps only do A to B.
 import { useEffect, useMemo, useRef, useState } from "react";
+import PageHeader from "@/components/signage/PageHeader";
+import { PlanIcon } from "@/components/signage/Icons";
 import Button from "@/components/ui/Button";
 import PlacePicker, { toUiPlace, type UiPlace } from "@/components/plan/PlacePicker";
 import TripTimeline from "@/components/plan/TripTimeline";
@@ -35,7 +37,7 @@ function Switch({ label, hint, on, onChange }: { label: string; hint?: string; o
     <button type="button" role="switch" aria-checked={on} onClick={() => onChange(!on)} className="flex min-h-[44px] w-full items-center justify-between gap-3 text-left">
       <span>
         <span className="block text-sm font-medium">{label}</span>
-        {hint && <span className="block text-xs text-ink/60">{hint}</span>}
+        {hint && <span className="block text-xs text-muted">{hint}</span>}
       </span>
       <span className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${on ? "bg-line-green" : "bg-black/20"}`} aria-hidden>
         <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${on ? "translate-x-[22px]" : "translate-x-0.5"}`} />
@@ -138,21 +140,27 @@ export default function PlanPage() {
   const minLocal = now ? toLocalInput(now) : undefined;
 
   return (
-    <div className="space-y-4 p-4">
-      <header>
-        <h1 className="text-xl font-bold">Plan your day</h1>
-        <p className="text-sm text-ink/60">Add every stop. Get one timeline with train times for the whole trip.</p>
-      </header>
+    <div>
+      <PageHeader
+        title="Plan your day"
+        subtitle="Add every stop. Get one timeline with train times for the whole trip."
+        leading={
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-line-blue text-white">
+            <PlanIcon size={24} />
+          </span>
+        }
+      />
+      <div className="space-y-4 p-4">
 
       <button
         type="button"
         onClick={() => { const e = example(); setStart(e.start); setVia(e.via); setEnd(e.end); setTrip(null); setError(null); setLeaveMode("now"); }}
-        className="min-h-[44px] rounded-full border border-black/15 bg-white px-4 text-sm"
+        className="min-h-[44px] rounded-full border-2 border-ink bg-white px-4 text-sm"
       >
         Try an example: museum, dinner, show
       </button>
 
-      <section className="space-y-3 rounded-xl bg-white p-3" aria-label="Stops">
+      <section className="space-y-3 rounded-card border-2 border-ink bg-white p-3" aria-label="Stops">
         <PlacePicker label="Start" placeholder="Where are you starting?" value={start} onPick={setStart} onClear={() => setStart(null)} allowLocation />
 
         {via.length > 0 && (
@@ -167,12 +175,12 @@ export default function PlanPage() {
                     <button type="button" onClick={() => setVia((v) => v.filter((_, j) => j !== i))} aria-label={`Remove ${p.name}`} className="h-11 w-11 text-line-red">✕</button>
                   </div>
                 </div>
-                <label className="flex items-center gap-2 text-xs text-ink/70">
+                <label className="flex items-center gap-2 text-xs text-muted">
                   Stay
                   <select
                     value={p.dwellMin}
                     onChange={(e) => setVia((v) => v.map((x, j) => (j === i ? { ...x, dwellMin: Number(e.target.value) } : x)))}
-                    className="min-h-[36px] rounded-md border border-black/20 bg-white px-2 text-sm"
+                    className="min-h-[36px] rounded-md border-2 border-ink bg-white px-2 text-sm"
                   >
                     {[...new Set([...DWELL_OPTIONS, p.dwellMin])].sort((a, b) => a - b).map((m) => <option key={m} value={m}>{m} min</option>)}
                   </select>
@@ -191,13 +199,13 @@ export default function PlanPage() {
             onPick={(p) => setVia((v) => [...v, p])}
           />
         ) : (
-          <p className="text-xs text-ink/60">That&apos;s the most stops a trip can have.</p>
+          <p className="text-xs text-muted">That&apos;s the most stops a trip can have.</p>
         )}
 
         <PlacePicker label="End" placeholder="Where do you finish?" value={end} onPick={setEnd} onClear={() => setEnd(null)} />
       </section>
 
-      <section className="space-y-2 rounded-xl bg-white p-3" aria-label="Timing and options">
+      <section className="space-y-2 rounded-card border-2 border-ink bg-white p-3" aria-label="Timing and options">
         <div role="radiogroup" aria-label="When" className="flex gap-2">
           {([["now", "Leave now"], ["later", "Leave at"], ["arrive", "Arrive by"]] as const).map(([m, label]) => (
             <button key={m} type="button" role="radio" aria-checked={leaveMode === m} onClick={() => setLeaveMode(m)}
@@ -208,12 +216,12 @@ export default function PlanPage() {
         </div>
         {leaveMode === "later" && (
           <label className="block text-sm">Leave at
-            <input type="datetime-local" value={leaveAt} min={minLocal} onChange={(e) => setLeaveAt(e.target.value)} className="mt-1 min-h-[44px] w-full rounded-lg border border-black/20 px-3" />
+            <input type="datetime-local" value={leaveAt} min={minLocal} onChange={(e) => setLeaveAt(e.target.value)} className="mt-1 min-h-[44px] w-full rounded-full border-2 border-ink px-3" />
           </label>
         )}
         {leaveMode === "arrive" && (
           <label className="block text-sm">Be at the end by
-            <input type="datetime-local" value={arriveAt} min={minLocal} onChange={(e) => setArriveAt(e.target.value)} className="mt-1 min-h-[44px] w-full rounded-lg border border-black/20 px-3" />
+            <input type="datetime-local" value={arriveAt} min={minLocal} onChange={(e) => setArriveAt(e.target.value)} className="mt-1 min-h-[44px] w-full rounded-full border-2 border-ink px-3" />
           </label>
         )}
         <Switch label="Earliest finish" hint="We try different stop orders against real train times and pick the one that ends earliest, with everything open." on={optimize} onChange={setOptimize} />
@@ -223,7 +231,7 @@ export default function PlanPage() {
       <Button onClick={plan} disabled={!ready || busy || (leaveMode === "later" && !leaveAt) || (leaveMode === "arrive" && !arriveAt)} className="w-full">
         {busy ? "Planning…" : "Plan trip"}
       </Button>
-      {!ready && <p className="text-xs text-ink/60">Pick a start and an end to plan.</p>}
+      {!ready && <p className="text-xs text-muted">Pick a start and an end to plan.</p>}
       {error && <p role="alert" className="rounded-lg border border-line-red bg-line-red/10 p-3 text-sm">{error}</p>}
 
       <div ref={resultRef} aria-live="polite" className="scroll-mt-4 space-y-3">
@@ -232,16 +240,17 @@ export default function PlanPage() {
             <TripTimeline trip={trip} />
             <div className="flex gap-2">
               {canShare && (
-                <button type="button" onClick={copyLink} className="min-h-[44px] flex-1 rounded-lg border border-black/20 bg-white text-sm font-medium">
+                <button type="button" onClick={copyLink} className="min-h-[44px] flex-1 rounded-full border-2 border-ink bg-white text-sm font-medium">
                   {copied ? "Link copied" : "Copy plan link"}
                 </button>
               )}
-              <button type="button" onClick={plan} disabled={busy} className="min-h-[44px] flex-1 rounded-lg border border-black/20 bg-white text-sm font-medium disabled:opacity-50">
+              <button type="button" onClick={plan} disabled={busy} className="min-h-[44px] flex-1 rounded-full border-2 border-ink bg-white text-sm font-medium disabled:opacity-50">
                 Refresh times
               </button>
             </div>
           </>
         )}
+      </div>
       </div>
     </div>
   );
