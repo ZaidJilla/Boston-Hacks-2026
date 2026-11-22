@@ -14,7 +14,14 @@ import {
   type RestaurantFilters,
 } from "@/lib/geo";
 
-export type FilterSection = "craving" | "price" | "line";
+export type FilterSection = "show" | "craving" | "price" | "line";
+
+export type SheetLayer = "food" | "landmark" | "shopping";
+const LAYERS: { id: SheetLayer; label: string }[] = [
+  { id: "food", label: "Food" },
+  { id: "landmark", label: "Landmarks" },
+  { id: "shopping", label: "Shopping" },
+];
 
 interface Props {
   open: boolean;
@@ -23,6 +30,9 @@ interface Props {
   onClose: () => void;
   filters: RestaurantFilters;
   onChange: (f: RestaurantFilters) => void;
+  /** Which kinds of places are on the map. */
+  layers: Set<SheetLayer>;
+  onLayersChange: (next: Set<SheetLayer>) => void;
   resultCount: number;
   unlocked: Set<string>;
   onNearMe: (radiusM: number) => void;
@@ -83,6 +93,8 @@ export default function FilterSheet({
   onClose,
   filters,
   onChange,
+  layers,
+  onLayersChange,
   resultCount,
   unlocked,
   onNearMe,
@@ -126,8 +138,29 @@ export default function FilterSheet({
         </div>
 
         <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain px-5 pb-4 pt-2">
-          <Section id="filter-craving" title="Craving">
+          <Section id="filter-show" title="What to show">
             <div className="flex flex-wrap gap-2.5">
+              {LAYERS.map((l) => (
+                <Chip
+                  key={l.id}
+                  active={layers.has(l.id)}
+                  onClick={() => {
+                    const next = new Set(layers);
+                    if (next.has(l.id)) next.delete(l.id);
+                    else next.add(l.id);
+                    onLayersChange(next);
+                  }}
+                >
+                  {l.label}
+                </Chip>
+              ))}
+            </div>
+            <p className="text-[13px] text-muted">Pick one or more. Opening a neighborhood shows everything inside it.</p>
+          </Section>
+
+          <Section id="filter-craving" title="Craving">
+            {!layers.has("food") && <p className="text-[13px] text-muted">Turn on Food to filter by craving.</p>}
+            <div className={`flex flex-wrap gap-2.5 ${layers.has("food") ? "" : "pointer-events-none opacity-40"}`} aria-disabled={!layers.has("food")}>
               {cravings.map((c) => (
                 <Chip
                   key={c.id}
@@ -250,7 +283,14 @@ export default function FilterSheet({
         </div>
 
         <div className="flex gap-2.5 border-t-2 border-ink bg-white px-5 py-3">
-          <button type="button" onClick={() => onChange(DEFAULT_FILTERS)} className={`${buttonClass("outline")} flex-1 !px-3`}>
+          <button
+            type="button"
+            onClick={() => {
+              onChange(DEFAULT_FILTERS);
+              onLayersChange(new Set<SheetLayer>(["food", "landmark", "shopping"]));
+            }}
+            className={`${buttonClass("outline")} flex-1 !px-3`}
+          >
             Reset
           </button>
           <button type="button" onClick={onClose} className={`${buttonClass("primary")} flex-[2] !px-3`}>

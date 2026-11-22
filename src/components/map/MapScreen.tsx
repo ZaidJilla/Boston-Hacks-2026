@@ -11,7 +11,6 @@ import {
   distanceM,
   filterPlaces,
   filterRestaurants,
-  MAP_LAYERS,
   mapPlaces,
   LINE_ORDER,
   lineColor,
@@ -26,7 +25,7 @@ import {
   type RestaurantFilters,
 } from "@/lib/geo";
 import LineStripe from "@/components/signage/LineStripe";
-import { LocateIcon, SlidersIcon } from "@/components/signage/Icons";
+import { ChevronDownIcon, LocateIcon } from "@/components/signage/Icons";
 import FogMap, { boundsFor, type FlyTarget } from "./FogMap";
 import FilterSheet, { type FilterSection } from "./FilterSheet";
 import PeekCard from "./PeekCard";
@@ -57,6 +56,60 @@ function locate(): Promise<{ lat: number; lng: number }> {
   });
 }
 
+const ALL_LAYERS: MapLayer[] = ["food", "landmark", "shopping"];
+const LAYER_NAME: Record<MapLayer, string> = { food: "Food", landmark: "Landmarks", shopping: "Shopping" };
+
+/** Left pill: what is on the map. Short, so all three pills fit at 375 px. */
+function layerSummary(layers: Set<MapLayer>): string {
+  if (layers.size === ALL_LAYERS.length) return "Places";
+  if (!layers.size) return "Nothing";
+  if (layers.size === 1) return LAYER_NAME[ALL_LAYERS.find((l) => layers.has(l))!];
+  return `${layers.size} types`;
+}
+
+/** "$ to $$", "$$", "$, $$$" */
+function priceSummary(prices: number[]): string {
+  const p = [...prices].sort();
+  if (!p.length) return "Price";
+  if (p.length > 1 && p[p.length - 1] - p[0] === p.length - 1) return `${"$".repeat(p[0])} to ${"$".repeat(p[p.length - 1])}`;
+  return p.map((n) => "$".repeat(n)).join(", ");
+}
+
+function cravingSummary(ids: RestaurantFilters["cravings"]): string {
+  if (!ids.length) return "Craving";
+  if (ids.length === 1) return cravingById.get(ids[0])?.label ?? "1 craving";
+  return `${ids.length} cravings`;
+}
+
+function FilterPill({
+  active,
+  onClick,
+  children,
+  label,
+  className = "",
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  label: string;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      aria-haspopup="dialog"
+      className={`flex h-11 min-w-0 flex-auto items-center justify-center gap-1.5 rounded-full px-3.5 text-[15px] font-extrabold ${
+        active ? "bg-signal text-ink" : "bg-white text-ink"
+      } ${className}`}
+    >
+      {children}
+      <ChevronDownIcon size={16} className="shrink-0" />
+    </button>
+  );
+}
+
 export default function MapScreen() {
   const { unlocked, checkins } = useUnlocked();
 
@@ -73,7 +126,8 @@ export default function MapScreen() {
 
   // Default view is the neighborhoods and a few famous landmarks. Every restaurant, shop and smaller
   // landmark appears once a neighborhood is opened or a filter is set.
-  const focused = activeFilterCount(filters) > 0;
+  const layersChanged = layers.size !== ALL_LAYERS.length;
+  const focused = activeFilterCount(filters) > 0 || layersChanged;
   const visible = useMemo(
     () => (focused && layers.has("food") ? filterRestaurants(restaurants, filters) : []),
     [focused, filters, layers],
@@ -82,7 +136,7 @@ export default function MapScreen() {
   // them is what pulls people toward somewhere new. Everything else shows once a neighborhood opens.
   const visiblePlaces = useMemo(() => {
     const all = mapPlaces.filter((p) => p.type !== "store");
-    const iconic = all.filter((p) => p.iconic);
+    const iconic = layers.has("landmark") ? all.filter((p) => p.iconic) : [];
     if (!focused) return iconic;
     const rest = filterPlaces(
       all.filter((p) => !p.iconic && layers.has(p.type === "landmark" ? "landmark" : "shopping")),
@@ -91,13 +145,8 @@ export default function MapScreen() {
     return [...iconic, ...rest];
   }, [focused, filters, layers]);
 
-  const toggleLayer = useCallback((id: MapLayer) => {
-    setLayers((cur) => {
-      const next = new Set(cur);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const changeLayers = useCallback((next: Set<MapLayer>) => {
+    setLayers(next);
     setSelected(null);
     setSelectedPlace(null);
   }, []);
@@ -159,6 +208,7 @@ export default function MapScreen() {
   }, []);
   const backToAll = useCallback(() => {
     changeFilters(DEFAULT_FILTERS);
+    setLayers(new Set(ALL_LAYERS));
     setHoodInfo(null);
     setFlyTo({ kind: "point", lat: BOSTON_CENTER[0], lng: BOSTON_CENTER[1], zoom: 13 });
   }, [changeFilters]);
@@ -180,9 +230,7 @@ export default function MapScreen() {
   const tappedHoodName = hoodInfo ? neighborhoodById.get(hoodInfo)?.properties.name : null;
 
   const unlockedDots = Math.min(4, unlocked.size === 0 ? 0 : Math.max(1, Math.round((unlocked.size / TOTAL_HOODS) * 4)));
-  // Craving, price, line and local-only. Where you are looking (a neighborhood) is not a filter chip.
-  const filterCount =
-    (filters.cravings.length ? 1 : 0) + (filters.prices.length ? 1 : 0) + (filters.lines.length ? 1 : 0) + (filters.hideChains ? 1 : 0);
+  const lineFilter = filters.lines.length ? LINE_ORDER.filter((l) => filters.lines.includes(l)) : LINE_ORDER.slice(0, 4);
 
   return (
     // fills the screen above the app's bottom nav
@@ -213,34 +261,41 @@ export default function MapScreen() {
             </Link>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setSheet("craving")}
-            aria-haspopup="dialog"
-            aria-label={filterCount ? `Filters, ${filterCount} on` : "Filters"}
-            className={`flex h-11 w-full items-center justify-center gap-2 rounded-full text-[16px] font-extrabold text-ink ${
-              filterCount ? "bg-signal" : "bg-white"
-            }`}
-          >
-            <SlidersIcon size={20} />
-            Filters
-            {filterCount > 0 && (
-              <span className="flex h-6 min-w-6 items-center justify-center rounded-full bg-ink px-1.5 text-[13px] font-black text-white">
-                {filterCount}
+          <div className="flex gap-2">
+            <FilterPill
+              active={layersChanged || filters.cravings.length > 0}
+              onClick={() => setSheet("show")}
+              className="!flex-[1.4]"
+              label={`What to show: ${layerSummary(layers)}${filters.cravings.length ? `, ${cravingSummary(filters.cravings)}` : ""}`}
+            >
+              <span className="truncate">{layerSummary(layers)}</span>
+            </FilterPill>
+            <FilterPill
+              active={filters.prices.length > 0}
+              onClick={() => setSheet("price")}
+              label={`Price filter: ${filters.prices.length ? priceSummary(filters.prices) : "any"}`}
+            >
+              <span className="truncate">{priceSummary(filters.prices)}</span>
+            </FilterPill>
+            <FilterPill
+              active={filters.lines.length > 0}
+              onClick={() => setSheet("line")}
+              label={`T line filter: ${filters.lines.length ? filters.lines.join(", ") : "any"}`}
+            >
+              <span className="flex shrink-0 -space-x-0.5" aria-hidden="true">
+                {lineFilter.map((l) => (
+                  <span key={l} className="h-2.5 w-2.5 rounded-full ring-1 ring-white" style={{ background: lineColor(l) }} />
+                ))}
               </span>
-            )}
-          </button>
+              <span className="truncate">T line</span>
+            </FilterPill>
+          </div>
 
           {focused && (
-            <div className="flex gap-2 overflow-x-auto" role="group" aria-label="Show on map">
-              <Chip onClick={backToAll} aria-pressed={undefined} aria-label="Back to all of Boston" className="!px-3">
-                ✕
+            <div className="flex">
+              <Chip onClick={backToAll} aria-pressed={undefined} aria-label="Back to all of Boston">
+                ✕ All of Boston
               </Chip>
-              {MAP_LAYERS.map((l) => (
-                <Chip key={l.id} selected={layers.has(l.id)} accent onClick={() => toggleLayer(l.id)}>
-                  {l.label}
-                </Chip>
-              ))}
             </div>
           )}
         </div>
@@ -327,6 +382,8 @@ export default function MapScreen() {
         onClose={closeSheet}
         filters={filters}
         onChange={changeFilters}
+        layers={layers}
+        onLayersChange={changeLayers}
         resultCount={visible.length + visiblePlaces.length}
         unlocked={unlocked}
         onNearMe={nearMe}
