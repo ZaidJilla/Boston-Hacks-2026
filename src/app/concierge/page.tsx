@@ -6,7 +6,8 @@ import { chipClass } from "@/components/ui/Button";
 import PageHeader from "@/components/signage/PageHeader";
 import LineBullet, { LINE_NAME, LINE_ORDER, lineTextColor } from "@/components/signage/LineBullet";
 import RouteStrip from "@/components/signage/RouteStrip";
-import { ArrowUpIcon, ChatIcon } from "@/components/signage/Icons";
+import ConciergeMark from "@/components/concierge/ConciergeMark";
+import { ArrowUpIcon } from "@/components/signage/Icons";
 import { useArrivals } from "@/components/signage/useArrivals";
 import { useUnlocked } from "@/components/map/useUnlocked";
 import { LINE_COLORS } from "@/lib/config";
@@ -79,18 +80,14 @@ export default function ConciergePage() {
     <div className="flex min-h-[calc(100dvh-60px)] flex-col">
       <PageHeader
         title="Concierge"
-        subtitle="Spots and the way there by T"
-        leading={
-          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-line-blue text-white">
-            <ChatIcon size={24} />
-          </span>
-        }
+        subtitle="Your next move, by T"
+        leading={<ConciergeMark size={48} />}
       />
 
       <div
         className="flex gap-2.5 overflow-x-auto px-4 py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         role="group"
-        aria-label="Cravings"
+        aria-label="Quick picks"
       >
         {cravings.map((c) => (
           <button
@@ -112,9 +109,14 @@ export default function ConciergePage() {
       <div className="flex-1 space-y-3 px-4 pb-4" aria-live="polite">
         {messages.length === 0 && (
           <div className="space-y-3">
+            <div className="flex flex-col items-center pb-1 pt-3 text-center">
+              <div className="unlock-drop-soft"><ConciergeMark size={104} /></div>
+              <h2 className="mt-3 text-[26px] font-black leading-tight tracking-[-0.5px]">What&rsquo;s the plan?</h2>
+              <p className="mt-1 max-w-[280px] text-[15px] text-muted">Pick a mood below, or tell me where you&rsquo;re headed.</p>
+            </div>
             <p className="max-w-[88%] rounded-[18px] rounded-bl-[4px] bg-panel px-4 py-3 text-[16px] leading-snug">
-              Tell me what you&rsquo;re craving and your budget, or where you are and where you&rsquo;re going. I&rsquo;ll find spots
-              that barely change your trip.
+              Tell me what you&rsquo;re in the mood for and your budget, or where you&rsquo;re starting and where you&rsquo;re going.
+              I&rsquo;ll find stops that barely change your trip.
             </p>
             <div className="flex flex-wrap gap-2.5" role="group" aria-label="Examples">
               {ROUTE_EXAMPLES.map((q) => (
@@ -135,9 +137,12 @@ export default function ConciergePage() {
             </div>
           ) : (
             <div key={i} className="space-y-3">
-              <p className="max-w-[88%] rounded-[18px] rounded-bl-[4px] bg-panel px-4 py-3 text-[16px] leading-snug">
-                {m.content}
-              </p>
+              <div className="flex items-end gap-2">
+                <span className="shrink-0"><ConciergeMark size={28} /></span>
+                <p className="max-w-[88%] rounded-[18px] rounded-bl-[4px] bg-panel px-4 py-3 text-[16px] leading-snug">
+                  {m.content}
+                </p>
+              </div>
               {m.places?.map((p) => <PlacePick key={p.id} p={p} detour={m.detours?.find((d) => d.id === p.id)} />)}
               {m.picks?.map((r) => <PickCard key={r.id} id={r.id} detour={m.detours?.find((d) => d.id === r.id)} />)}
             </div>
@@ -170,13 +175,13 @@ export default function ConciergePage() {
         className="sticky bottom-nav flex items-center gap-2.5 border-t-2 border-ink bg-white px-4 py-3"
       >
         <label htmlFor="q" className="sr-only">
-          What are you craving?
+          What&rsquo;s the plan?
         </label>
         <input
           id="q"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="What are you craving?"
+          placeholder="What's the plan?"
           autoComplete="off"
           className="h-12 min-w-0 flex-1 rounded-full border-2 border-ink bg-white px-5 text-[16px] placeholder:text-muted"
         />
