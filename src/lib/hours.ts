@@ -18,11 +18,13 @@ export function formatOsmHours(raw: string | null | undefined): string[] {
   if (!raw) return [];
   if (raw.trim() === "24/7") return ["Open 24 hours"];
   return raw
-    .split(/\s*;\s*|,\s+(?=(?:Mo|Tu|We|Th|Fr|Sa|Su|PH)\b)/)
+    .split(/\s*(?:;|\|\|)\s*|,\s+(?=(?:Mo|Tu|We|Th|Fr|Sa|Su|PH)\b)/)
     .map((part) => part.trim())
     .filter(Boolean)
     .map((part) =>
       part
+        .replace(/\s+open\b/gi, "")
+        .replace(/"([^"]*)"/g, "($1)")
         .replace(/\b(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})\+?/g, (_, a, b) => `${time(a)}–${time(b)}`)
         .replace(/\b(Mo|Tu|We|Th|Fr|Sa|Su|PH)\b/g, (d) => DAYS[d])
         .replace(/([A-Za-z]{3})-([A-Za-z]{3})/g, "$1–$2")
