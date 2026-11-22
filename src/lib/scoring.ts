@@ -137,3 +137,36 @@ export function pointsForAdventure(i: AdventureScoreInput): number {
 export function isUnlocked(distinctRestaurantsInHood: number): boolean {
   return distinctRestaurantsInHood >= UNLOCK_THRESHOLD;
 }
+
+// ---------- Ranks ----------
+// Earned by unlocking neighborhoods (exploration, not grinding points). Lowest first.
+// Colors and art live in the UI; only the rules live here.
+export const RANKS = [
+  { id: "visitor", name: "Visitor", minUnlocks: 0, blurb: "Fresh off the T. The city is still foggy." },
+  { id: "regular", name: "Regular", minUnlocks: 1, blurb: "You've cleared your first neighborhood." },
+  { id: "local", name: "Local", minUnlocks: 4, blurb: "You know the city past your campus." },
+  { id: "legend", name: "Legend", minUnlocks: 10, blurb: "Most of Boston is yours." },
+] as const;
+
+export type Rank = (typeof RANKS)[number];
+export type RankId = Rank["id"];
+
+/** The rank a player holds with this many unlocked neighborhoods. */
+export function rankFor(unlockedNeighborhoods: number): Rank {
+  let rank: Rank = RANKS[0];
+  for (const r of RANKS) if (unlockedNeighborhoods >= r.minUnlocks) rank = r;
+  return rank;
+}
+
+export const rankIndex = (id: RankId): number => RANKS.findIndex((r) => r.id === id);
+
+/** Current rank, the next one (if any), and how many more unlocks it takes to get there. */
+export function rankProgress(unlockedNeighborhoods: number): {
+  rank: Rank;
+  next: Rank | null;
+  unlocksToNext: number;
+} {
+  const rank = rankFor(unlockedNeighborhoods);
+  const next = RANKS[rankIndex(rank.id) + 1] ?? null;
+  return { rank, next, unlocksToNext: next ? next.minUnlocks - unlockedNeighborhoods : 0 };
+}

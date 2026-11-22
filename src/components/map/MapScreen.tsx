@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { Chip } from "@/components/ui/Button";
-import { APP_NAME, BOSTON_CENTER, UNLOCKED_COLOR } from "@/lib/config";
+import { APP_NAME, BOSTON_CENTER } from "@/lib/config";
 import {
   activeFilterCount,
   cravingById,
@@ -31,6 +31,10 @@ import FilterSheet, { type FilterSection } from "./FilterSheet";
 import PeekCard from "./PeekCard";
 import PlaceCard from "./PlaceCard";
 import { useUnlocked } from "./useUnlocked";
+import { useRankUp } from "./useRankUp";
+import RankBadge from "@/components/rank/RankBadge";
+import RankUpScreen from "@/components/rank/RankUpScreen";
+import { rankProgress } from "@/lib/scoring";
 
 const TOTAL_HOODS = neighborhoods.features.length;
 
@@ -111,7 +115,9 @@ function FilterPill({
 }
 
 export default function MapScreen() {
-  const { unlocked, checkins } = useUnlocked();
+  const { unlocked, checkins, uid, loaded } = useUnlocked();
+  const { rank, next, unlocksToNext } = rankProgress(unlocked.size);
+  const { rankUp, dismiss: dismissRankUp } = useRankUp(uid, unlocked.size, loaded);
 
   const [filters, setFilters] = useState<RestaurantFilters>(DEFAULT_FILTERS);
   const [sheet, setSheet] = useState<FilterSection | null>(null);
@@ -229,7 +235,6 @@ export default function MapScreen() {
   const eaten = pick ? restaurantsIn(pick.neighborhood).filter((r) => checkins.has(r.id)).length : 0;
   const tappedHoodName = hoodInfo ? neighborhoodById.get(hoodInfo)?.properties.name : null;
 
-  const unlockedDots = Math.min(4, unlocked.size === 0 ? 0 : Math.max(1, Math.round((unlocked.size / TOTAL_HOODS) * 4)));
   const lineFilter = filters.lines.length ? LINE_ORDER.filter((l) => filters.lines.includes(l)) : LINE_ORDER.slice(0, 4);
 
   return (
@@ -250,18 +255,15 @@ export default function MapScreen() {
             </div>
             <Link
               href="/profile"
-              className="flex min-h-[44px] items-center gap-2 rounded-full bg-white px-3.5 text-[14px] font-extrabold text-ink"
+              aria-label={`${rank.name}, ${unlocked.size} of ${TOTAL_HOODS} neighborhoods unlocked${
+                next ? `, ${unlocksToNext} more to ${next.name}` : ""
+              }`}
+              className="flex min-h-[44px] shrink-0 items-center gap-2 rounded-full bg-white px-3 text-[14px] font-extrabold text-ink"
             >
-              <span className="flex gap-1" aria-hidden="true">
-                {Array.from({ length: 4 }, (_, i) => (
-                  <span
-                    key={i}
-                    className={`h-2.5 w-2.5 rounded-full ${i < unlockedDots ? "" : "bg-rail"}`}
-                    style={i < unlockedDots ? { background: UNLOCKED_COLOR } : undefined}
-                  />
-                ))}
+              <RankBadge rank={rank} />
+              <span aria-hidden="true">
+                {unlocked.size} of {TOTAL_HOODS}
               </span>
-              {unlocked.size} of {TOTAL_HOODS} unlocked
             </Link>
           </div>
 
@@ -379,6 +381,8 @@ export default function MapScreen() {
           )}
         </div>
       </div>
+
+      {rankUp && <RankUpScreen rank={rankUp} unlocked={unlocked.size} onClose={dismissRankUp} />}
 
       <FilterSheet
         open={sheet !== null}
