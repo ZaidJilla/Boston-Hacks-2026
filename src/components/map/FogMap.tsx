@@ -45,6 +45,13 @@ const AMBER = "#FFB81C";
 /** At this zoom and closer, pins become DOM markers with a ✓ or ? glyph. */
 const PIN_ZOOM = 14;
 
+/**
+ * Pins grow with the map: none while zoomed far out, a small mark at city zoom, full size once you
+ * are in close. 0 at zoom 12 and below, then 0.6, 0.75, 0.9, 1 from zoom 13 to 16.
+ */
+const PIN_MIN_ZOOM = 13;
+const pinScale = (zoom: number) => (zoom < PIN_MIN_ZOOM ? 0 : Math.min(1, 0.6 + (zoom - PIN_MIN_ZOOM) * 0.15));
+
 const FOG_FILL: PathOptions = { stroke: false, fillColor: FOG, fillOpacity: 0.9 };
 const FOG_EDGE: PathOptions = { fill: false, color: MUTED, weight: 2, opacity: 0.9, dashArray: "6 6" };
 const CLEAR_EDGE: PathOptions = { fill: false, color: LINE_COLORS.green, weight: 5, opacity: 1 };
@@ -194,11 +201,13 @@ function placeIcon(type: MapPlace["type"], state: "selected" | "clear" | "fog", 
     type === "landmark"
       ? `<polygon points="10,1.5 18.5,10 10,18.5 1.5,10" fill="${fill}" stroke="${stroke}" stroke-width="${w}" stroke-linejoin="round"/>`
       : `<rect x="3" y="3" width="14" height="14" rx="2.5" fill="${fill}" stroke="${stroke}" stroke-width="${w}"/>`;
+  // Small pins keep a 26 px tap target around them.
+  const box = Math.max(size, 26);
   const icon = L.divIcon({
     className: "place-pin",
-    html: `<svg width="${size}" height="${size}" viewBox="0 0 20 20" aria-hidden="true" style="display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35))">${shape}</svg>`,
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
+    html: `<div style="width:${box}px;height:${box}px;display:flex;align-items:center;justify-content:center"><svg width="${size}" height="${size}" viewBox="0 0 20 20" aria-hidden="true" style="display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35))">${shape}</svg></div>`,
+    iconSize: [box, box],
+    iconAnchor: [box / 2, box / 2],
   });
   placeIconCache.set(key, icon);
   return icon;
@@ -217,7 +226,7 @@ function PlacePins({
 }) {
   const map = useMap();
   const { zoom, bounds } = useView();
-  const base = zoom <= 13 ? 11 : zoom <= 14 ? 13 : 16;
+  const base = Math.round(18 * pinScale(zoom));
 
   // Label a famous place only if its label doesn't land on one already placed, so downtown doesn't
   // become a pile of overlapping names. Shorter names go first because they pack better.
@@ -240,6 +249,8 @@ function PlacePins({
     // `bounds` changes after every pan or zoom, and label positions are screen-relative
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [places, zoom, bounds, selectedId, map, base]);
+
+  if (base === 0) return null;
 
   return (
     <>
@@ -277,13 +288,14 @@ function PlacePins({
   );
 }
 
-function pinIcon(state: PinState, selected: boolean): L.DivIcon {
-  const size = selected ? 28 : 21;
+function pinIcon(state: PinState, selected: boolean, base: number): L.DivIcon {
+  const size = selected ? base + 6 : base;
+  const glyphPx = Math.max(7, Math.round(size * 0.55));
   const glyph =
     state === "visited"
-      ? `<svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`
+      ? `<svg width="${glyphPx}" height="${glyphPx}" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12.5 4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`
       : state === "fog"
-        ? `<span style="font:900 12px/1 var(--font-inter),sans-serif;color:#000">?</span>`
+        ? `<span style="font:900 ${glyphPx}px/1 var(--font-inter),sans-serif;color:#000">?</span>`
         : "";
   const ring = selected ? `box-shadow:0 0 0 3px #fff,0 0 0 6px ${LINE_COLORS.blue};` : "box-shadow:0 2px 4px rgba(0,0,0,.25);";
   return L.divIcon({
@@ -310,14 +322,18 @@ function FoodPins({
   onSelect: (r: Restaurant) => void;
 }) {
   const { zoom, bounds } = useView();
+  const scale = pinScale(zoom);
+  const pinPx = Math.round(22 * scale);
   const icons = useMemo(() => {
     const m = new Map<string, L.DivIcon>();
     for (const s of ["visited", "fog", "clear"] as PinState[]) {
-      m.set(`${s}-0`, pinIcon(s, false));
-      m.set(`${s}-1`, pinIcon(s, true));
+      m.set(`${s}-0`, pinIcon(s, false, pinPx));
+      m.set(`${s}-1`, pinIcon(s, true, pinPx));
     }
     return m;
-  }, []);
+  }, [pinPx]);
+
+  if (scale === 0) return null;
 
   if (zoom >= PIN_ZOOM) {
     // DOM markers only for what's on screen, so a phone isn't juggling 700 of them.
@@ -344,7 +360,7 @@ function FoodPins({
   }
 
   // Small at city zoom so 700 spots don't bury the lines; zoom in for full pins.
-  const radius = zoom <= 12 ? 3 : 4;
+  const radius = Math.max(2, Math.round(4 * scale));
   return (
     <>
       {restaurants.map((r) => {
@@ -463,7 +479,8 @@ export default function FogMap({
         <Stations renderer={renderers.stations} />
       </Pane>
 
-      <Pane name="hoodlabels" style={{ zIndex: 425, pointerEvents: "none" }}>
+      {/* above every pin, so a neighborhood name is never covered by a dot or diamond */}
+      <Pane name="hoodlabels" style={{ zIndex: 450, pointerEvents: "none" }}>
         <HoodLabels unlocked={unlocked} />
       </Pane>
 

@@ -265,7 +265,7 @@ export default function MapScreen() {
             <FilterPill
               active={layersChanged || filters.cravings.length > 0}
               onClick={() => setSheet("show")}
-              className="!flex-[1.4]"
+              className="!flex-[1.3_1_auto]"
               label={`What to show: ${layerSummary(layers)}${filters.cravings.length ? `, ${cravingSummary(filters.cravings)}` : ""}`}
             >
               <span className="truncate">{layerSummary(layers)}</span>
