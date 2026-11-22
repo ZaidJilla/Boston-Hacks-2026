@@ -1,39 +1,122 @@
-// Server only. Leaderboards from Tiger Data, in-memory fallback in demo mode.
+// Server only. Leaderboards are SQL on Tiger Data, with the in-memory store when there's no
+// database. Never throws.
+import { DEMO_MODE } from "./config";
 import { getPool } from "./db";
-import { memLeaderboard } from "./store";
+import { ensureMemSeeded, mem, memLeaderboard } from "./store";
 import type { LeaderboardRow } from "./types";
 
+async function withFallback(label: string, sql: () => Promise<LeaderboardRow[]>, memory: () => LeaderboardRow[]) {
+  if (!getPool()) return memory();
+  try {
+    return await sql();
+  } catch (err) {
+    // In demo mode, keep the stage demo alive with the in-memory board. Outside demo mode,
+    // showing invented seed players as if they were real would be worse than an empty board.
+    console.error(`leaderboard ${label} failed${DEMO_MODE ? ", using memory" : ""}`, err);
+    return DEMO_MODE ? memory() : [];
+  }
+}
+
 export async function citywide(limit = 50): Promise<LeaderboardRow[]> {
-  const pool = getPool();
-  if (!pool) return memLeaderboard().slice(0, limit);
-  const { rows } = await pool.query(
-    "SELECT uid AS id, display_name AS name, college, points FROM users ORDER BY points DESC LIMIT $1",
-    [limit],
+  return withFallback(
+    "citywide",
+    async () =>
+      (
+        await getPool()!.query<LeaderboardRow>(
+          `SELECT uid AS id, display_name AS name, college, points
+             FROM users ORDER BY points DESC, display_name LIMIT $1`,
+          [limit],
+        )
+      ).rows,
+    () => memLeaderboard().slice(0, limit),
   );
-  return rows;
 }
 
 export async function byCollege(college: string, limit = 50): Promise<LeaderboardRow[]> {
-  const pool = getPool();
-  if (!pool) return memLeaderboard().filter((r) => r.college === college).slice(0, limit);
-  const { rows } = await pool.query(
-    "SELECT uid AS id, display_name AS name, college, points FROM users WHERE college = $1 ORDER BY points DESC LIMIT $2",
-    [college, limit],
+  return withFallback(
+    "byCollege",
+    async () =>
+      (
+        await getPool()!.query<LeaderboardRow>(
+          `SELECT uid AS id, display_name AS name, college, points
+             FROM users WHERE college = $1 ORDER BY points DESC, display_name LIMIT $2`,
+          [college, limit],
+        )
+      ).rows,
+    () => memLeaderboard().filter((r) => r.college === college).slice(0, limit),
   );
-  return rows;
 }
 
-/** Ranked by distinct restaurants checked into in this neighborhood. */
-export async function byNeighborhood(neighborhood: string, limit = 50): Promise<LeaderboardRow[]> {
-  const pool = getPool();
-  if (!pool) return []; // TODO(Person 2): compute from mem.checkins for the demo.
-  const { rows } = await pool.query(
-    `SELECT u.uid AS id, u.display_name AS name, u.college, COUNT(DISTINCT c.restaurant_id)::int AS points
-       FROM checkins c JOIN users u USING (uid)
-      WHERE c.neighborhood = $1 AND c.verified
-      GROUP BY u.uid, u.display_name, u.college
-      ORDER BY points DESC LIMIT $2`,
-    [neighborhood, limit],
+/** Colleges ranked by total points (for the College tab header). id = college name. */
+export async function collegeStandings(): Promise<LeaderboardRow[]> {
+  return withFallback(
+    "collegeStandings",
+    async () =>
+      (
+        await getPool()!.query<LeaderboardRow>(
+          `SELECT college AS id, college AS name, SUM(points)::int AS points
+             FROM users GROUP BY college ORDER BY points DESC`,
+        )
+      ).rows,
+    () => {
+      const totals = new Map<string, number>();
+      for (const r of memLeaderboard()) totals.set(r.college ?? "Other", (totals.get(r.college ?? "Other") ?? 0) + r.points);
+      return [...totals.entries()]
+        .map(([c, points]) => ({ id: c, name: c, points }))
+        .sort((a, b) => b.points - a.points);
+    },
   );
-  return rows;
+}
+
+/**
+ * Ranked by distinct restaurants checked into in this neighborhood (`points` = that count).
+ * Reads the `checkins_daily` continuous aggregate. A checkin row is only ever written on a
+ * first visit (first_visits PK), so summing daily counts = distinct restaurants.
+ */
+export async function byNeighborhood(neighborhood: string, limit = 50): Promise<LeaderboardRow[]> {
+  return withFallback(
+    "byNeighborhood",
+    async () => {
+      const pool = getPool()!;
+      try {
+        return (
+          await pool.query<LeaderboardRow>(
+            `SELECT u.uid AS id, u.display_name AS name, u.college, SUM(d.checkins)::int AS points
+               FROM checkins_daily d JOIN users u USING (uid)
+              WHERE d.neighborhood = $1
+              GROUP BY u.uid, u.display_name, u.college
+              ORDER BY points DESC, name LIMIT $2`,
+            [neighborhood, limit],
+          )
+        ).rows;
+      } catch {
+        // Aggregate not migrated yet: same answer straight from the hypertable.
+        return (
+          await pool.query<LeaderboardRow>(
+            `SELECT u.uid AS id, u.display_name AS name, u.college, COUNT(DISTINCT c.restaurant_id)::int AS points
+               FROM checkins c JOIN users u USING (uid)
+              WHERE c.neighborhood = $1 AND c.verified
+              GROUP BY u.uid, u.display_name, u.college
+              ORDER BY points DESC, name LIMIT $2`,
+            [neighborhood, limit],
+          )
+        ).rows;
+      }
+    },
+    () => {
+      ensureMemSeeded();
+      const perUser = new Map<string, Set<string>>();
+      for (const c of mem.checkins) {
+        if (c.neighborhood !== neighborhood || !c.verified) continue;
+        perUser.set(c.uid, (perUser.get(c.uid) ?? new Set()).add(c.restaurantId));
+      }
+      return [...perUser.entries()]
+        .map(([uid, rs]) => {
+          const u = mem.users.get(uid);
+          return { id: uid, name: u?.displayName ?? "Player", college: u?.college, points: rs.size };
+        })
+        .sort((a, b) => b.points - a.points || a.name.localeCompare(b.name))
+        .slice(0, limit);
+    },
+  );
 }
