@@ -7,7 +7,7 @@ import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from
 import { DEMO_MODE } from "./config";
 import { collegeFromEmail } from "./colleges";
 import { getClientAuth } from "./firebase";
-import { DEMO_USER } from "./seedData";
+import { DEMO_USER } from "./demoUser";
 
 export interface AppUser {
   uid: string;

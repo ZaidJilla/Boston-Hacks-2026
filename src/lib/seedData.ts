@@ -6,13 +6,9 @@ import type { Restaurant } from "./types";
 
 export const SEED_UID_PREFIX = "seed-";
 
-/** The signed-out demo player. Must match DEMO_USER in auth.tsx (client). */
-export const DEMO_USER: StoreUser = {
-  uid: "demo-user",
-  displayName: "Demo Student",
-  email: "demo@northeastern.edu",
-  college: "Northeastern",
-};
+// The signed-out demo player lives in demoUser.ts, small enough for the client bundle.
+import { DEMO_USER } from "./demoUser";
+export { DEMO_USER };
 
 const COLLEGES = [
   { name: "Boston University", domain: "bu.edu" },
